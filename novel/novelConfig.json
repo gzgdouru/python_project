@@ -1,0 +1,40 @@
+{
+  "email" : {
+    "smtp_server" : "smtp.163.com",
+    "sender" : "18719091650@163.com",
+    "sender_passwd" : "qq5201314ouru",
+    "charset" : "utf-8"
+  },
+
+  "database" : {
+    "host": "localhost",
+    "port": 3306,
+    "user" : "root",
+    "passwd" : "123456",
+    "db" : "mysql",
+    "charset" : "utf8"
+  },
+
+  "novel" : [
+    {
+      "name" : "全职法师",
+      "table" : "tb_full_time_mage",
+      "site" : [
+        {
+          "name" : "笔趣阁",
+          "url" : "http://www.booktxt.net/0_595/",
+          "status" : 1
+        },
+        {
+          "name" : "顶点中文网",
+          "url" :  "https://www.cangqionglongqi.com/quanzhifashi/",
+          "status" : 1
+        }
+      ],
+      "receiver" : [
+       "gzgdouru@163.com"
+      ],
+      "status" : 1
+    }
+  ]
+}
