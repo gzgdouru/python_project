@@ -1,0 +1,22 @@
+{
+	"hosts" : [
+		"localhost",
+		"172.16.34.16",
+		"52.56.97.113",
+		"172.16.39.1",
+		"192.168.34.203"
+	],
+	
+	"databases" : [
+		"ajb_shop_monitor",
+		"push",
+		"rtp",
+		"rtsp",
+		"upgrade"
+	],
+
+	"users" : [
+		"admin",
+		"postgres"
+	]
+}

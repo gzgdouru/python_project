@@ -1,0 +1,8 @@
+{
+    "constraints": [
+        {
+            "db": "ajb_shop_monitor",
+            "sql": "ALTER TABLE tb_ouru_test ALTER COLUMN id SET primary key;"
+        }
+    ]
+}
