@@ -58,6 +58,16 @@ class UpdateNotice:
             logger.error("init_novel() error:{}".format(str(e)))
             sys.exit(-1)
 
+    def reset_config(self, confPath="novelConfig.json"):
+        logger.info("reload config....")
+        self.conf = ParseConfig(confPath)
+        self.init_email()
+        self.init_database()
+        self.init_novel()
+
+    def show_config(self):
+        logger.info(json.dumps(self.conf.data, indent=2, ensure_ascii=False))
+
     def make_table(self, table):
         sql = "select count(*) as table_count from information_schema.TABLES WHERE table_name ='{}'".format(table)
         res, dbout = self.mydb.execute(sql)
@@ -98,7 +108,7 @@ class UpdateNotice:
                 parseFunc = self.parseMethod.get(siteName, self.default_parse)
                 newChapter = parseFunc(site)
                 if newChapter and self.save_chapter(siteName, newChapter, table):
-                    stderr = self.send_email(receiver, "小说更新提醒({})".format(novelName), "最新章节:{}".format(newChapter))
+                    stderr = self.send_email(receiver, "小说更新提醒({}-{})".format(novelName, siteName), "最新章节:{}".format(newChapter))
                     if not stderr:
                         logger.info("小说更新提醒({0}-{1}-{2}), send email to {3} success!)".format(
                             novelName, siteName, newChapter, str(receiver)))
