@@ -155,7 +155,7 @@ class UpdateNotice:
         try:
             respon = requests.get(url, headers={
                 'user-agent' : 'Mozilla/5.0'
-            }, timeout=10)
+            }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
             soup = BeautifulSoup(html, "html.parser")
@@ -177,7 +177,7 @@ class UpdateNotice:
         try:
             respon = requests.get(url, headers={
                 'user-agent': 'Mozilla/5.0'
-            }, timeout=10)
+            }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
             soup = BeautifulSoup(html, "html.parser")
