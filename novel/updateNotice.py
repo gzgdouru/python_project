@@ -134,9 +134,9 @@ class UpdateNotice:
         [thread.join() for thread in threads]
 
     def chapter_is_exist(self, chapter, table):
-        chapter = chapter.split(" ")[1].strip()
+        chapterName = self.get_chapter_name(chapter)
         allChapters = self.get_all_chapter(table)
-        return (chapter in allChapters)
+        return (chapterName in allChapters)
 
     def save_chapter(self, siteName, newChapter, table):
         try:
@@ -158,7 +158,7 @@ class UpdateNotice:
             }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "lxml")
             subNode = soup.body.dl
             for child in subNode.children:
                 try:
@@ -180,14 +180,15 @@ class UpdateNotice:
             }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "html.parser")
-            content = str(soup.find(id="content"))
+            soup = BeautifulSoup(html, "lxml")
+            contentNode = soup.find(id="content")
+            if contentNode.text: content = str(contentNode)
         except Exception as e:
-            stderr = str(3)
+            stderr = str(e)
         return content, stderr
 
     def send_chapter(self, table, chapter, novelName, siteName, receiver):
-        newChapter = chapter.split(" ")[1].strip()
+        newChapter = self.get_chapter_name(chapter)
         if not self.save_chapter(siteName, newChapter, table): return None
         subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter)
         content = "最新章节:{}".format(chapter)
@@ -199,28 +200,41 @@ class UpdateNotice:
 
     def send_chapter_has_content(self, table, chapters, novelName, siteName, receiver):
         allChapter = self.get_all_chapter(table)
-        if not self.get_table_count(table): chapters = chapters[-1:]    #如果表中没有数据, 则只发送最新一章
-        for chapterRecord in chapters[::-1]:
-            chapter = chapterRecord[1].split(" ")[1].strip()
-            if (chapter in allChapter) or (not self.save_chapter(siteName, chapter, table)): break
-            url = chapterRecord[0]
+        if not self.get_record_count(table): chapters = chapters[-1:]    #如果表中没有数据, 则只发送最新一章
+        timeCount = 1
+        for chapter in chapters[::-1]:
+            if timeCount > 3: break # 每次最多发送3封邮件
+            timeCount += 1
+
+            url = chapter[0]
+            chapterName = self.get_chapter_name(chapter[1])
+            if (chapterName in allChapter) or (not self.save_chapter(siteName, chapterName, table)): break
             parseContentFunc = self.parseContentMethod.get(siteName, self.default_parse_content)
             content, stderr = parseContentFunc(url)
             if content:
-                content = "<h3>{0}</h3>{1}".format(chapterRecord[1], content)
-                subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapterRecord[1])
+                content = "<h3>{0}</h3>{1}".format(chapter[1], content)
+                subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter[1])
+
+                # 邮件发送失败只输出错误, 不重新发送该章节
                 stderr = self.send_email(receiver, subject, content, mimeType="html")
                 if not stderr:
                     logger.info("{0} send email to {1} success.".format(subject, str(receiver)))
                 else:
                     logger.error("{0} send email to {1} failed!, error:{2}".format(subject, str(receiver), stderr))
-            else:
+            elif stderr:     # 解析网页出错
                 logger.error("paser url:{0} failed, error:{1}".format(url, stderr))
+            else:    # 内容还没更新, 下次再次解析
+                sql = "delete from {0} where name='{1}'".format(table, self.get_chapter_name(chapter))
+                self.mydb.execute(sql)
+                logger.info("{0}-{1}-{2}, 内容尚未更新.".format(novelName, siteName, chapter[1]))
 
-    def get_table_count(self, table):
+    def get_record_count(self, table):
         sql = "select count(*) as charpter_num from {}".format(table)
         res, dbout = self.mydb.execute(sql)
         return dbout[0].get("charpter_num")
+
+    def get_chapter_name(self, chapter):
+        return chapter.split(" ")[1].strip()
 
     def run(self):
         while True:
