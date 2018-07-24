@@ -81,9 +81,12 @@ class UpdateNotice:
         sql = '''
             create table {table_name} (
               id int primary key AUTO_INCREMENT,
-              source_site varchar(255),
-              name varchar(255),
-              send_time datetime
+              site varchar(255) UNIQUE,
+              site_name varchar(255),
+              chapter_name varchar(255),
+              send_time datetime,
+              KEY idx_site (site),
+              KEY idx_chapter_name (chapter_name)
             );
             '''.format(table_name=table)
         res, dbout = self.mydb.execute(sql)
@@ -114,11 +117,11 @@ class UpdateNotice:
                 siteName = site.get("name")
                 parseFunc = self.parseMethod.get(siteName, self.default_parse)
                 chapters = parseFunc(site)
-                if chapters and not self.chapter_is_exist(chapters[-1][1], table):
+                if chapters and not self.chapter_is_exist(chapters[-1], table):
                     if sendContent:
                         self.send_chapter_has_content(table, chapters, novelName, siteName, receiver)
                     else:
-                        self.send_chapter(table, chapters[-1][1], novelName, siteName, receiver)
+                        self.send_chapter(table, chapters[-1], novelName, siteName, receiver)
                     break
                 else:
                     logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, chapters[-1][1]))
@@ -134,14 +137,16 @@ class UpdateNotice:
         [thread.join() for thread in threads]
 
     def chapter_is_exist(self, chapter, table):
-        chapterName = self.get_chapter_name(chapter)
-        allChapters = self.get_all_chapter(table)
-        return (chapterName in allChapters)
+        chapterUrl = chapter[0]
+        chapterName = self.get_chapter_name(chapter[1])
+        sql = "select count(*) as num from {0} where site = '{1}' or chapter_name = '{2}'".format(table, chapterUrl, chapterName)
+        res, dbout = self.mydb.execute(sql)
+        return dbout[0].get("num")
 
-    def save_chapter(self, siteName, newChapter, table):
+    def save_chapter(self, siteName, chapter, table):
         try:
-            sql = "insert into {table}(source_site, name, send_time) values('{source_site}', '{name}', now())".format(
-                table=table, source_site=siteName, name=newChapter)
+            sql = "insert into {0}(site, site_name, chapter_name, send_time) values('{1}', '{2}', '{3}', now())".format(
+                table, chapter[0], siteName, self.get_chapter_name(chapter[1]))
             self.mydb.execute(sql)
             return True
         except Exception as e:
@@ -158,13 +163,19 @@ class UpdateNotice:
             }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "lxml")
+            soup = BeautifulSoup(html, "html.parser")
             subNode = soup.body.dl
             for child in subNode.children:
                 try:
-                    chapterUrl = "{}/{}".format(url, child.a["href"])
+                    pos = child.a["href"].rfind(r"/")
+                    chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
                     charpter = child.a.string
-                    chapters.append((chapterUrl, charpter))
+
+                    # 去掉重复更新的章节
+                    if chapters:
+                        if chapterUrl != chapters[-1][0]: chapters.append((chapterUrl, charpter))
+                    else:
+                        chapters.append((chapterUrl, charpter))
                 except:
                     pass
         except Exception as e:
@@ -180,7 +191,7 @@ class UpdateNotice:
             }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "lxml")
+            soup = BeautifulSoup(html, "html.parser")
             contentNode = soup.find(id="content")
             if contentNode.text: content = str(contentNode)
         except Exception as e:
@@ -188,10 +199,9 @@ class UpdateNotice:
         return content, stderr
 
     def send_chapter(self, table, chapter, novelName, siteName, receiver):
-        newChapter = self.get_chapter_name(chapter)
-        if not self.save_chapter(siteName, newChapter, table): return None
-        subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter)
-        content = "最新章节:{}".format(chapter)
+        if not self.save_chapter(siteName, chapter, table): return None
+        subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter[1])
+        content = "最新章节:{}".format(chapter[1])
         stderr = self.send_email(receiver, subject, content)
         if not stderr:
             logger.info("{0} send email to {1} success.".format(subject, str(receiver)))
@@ -199,7 +209,6 @@ class UpdateNotice:
             logger.error("{0} send email to {1} failed!, error:{2}".format(subject, str(receiver), stderr))
 
     def send_chapter_has_content(self, table, chapters, novelName, siteName, receiver):
-        allChapter = self.get_all_chapter(table)
         if not self.get_record_count(table): chapters = chapters[-1:]    #如果表中没有数据, 则只发送最新一章
         timeCount = 1
         for chapter in chapters[::-1]:
@@ -208,7 +217,7 @@ class UpdateNotice:
 
             url = chapter[0]
             chapterName = self.get_chapter_name(chapter[1])
-            if (chapterName in allChapter) or (not self.save_chapter(siteName, chapterName, table)): break
+            if self.chapter_is_exist(chapter, table) or (not self.save_chapter(siteName, chapter, table)): break
             parseContentFunc = self.parseContentMethod.get(siteName, self.default_parse_content)
             content, stderr = parseContentFunc(url)
             if content:
@@ -224,7 +233,7 @@ class UpdateNotice:
             elif stderr:     # 解析网页出错
                 logger.error("paser url:{0} failed, error:{1}".format(url, stderr))
             else:    # 内容还没更新, 下次再次解析
-                sql = "delete from {0} where name='{1}'".format(table, self.get_chapter_name(chapter))
+                sql = "delete from {0} where site='{1}'".format(table, chapter[0])
                 self.mydb.execute(sql)
                 logger.info("{0}-{1}-{2}, 内容尚未更新.".format(novelName, siteName, chapter[1]))
 
