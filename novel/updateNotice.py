@@ -75,7 +75,7 @@ class UpdateNotice:
         logger.info(json.dumps(self.conf.data, indent=2, ensure_ascii=False))
 
     def make_table(self, table):
-        sql = "select count(*) as table_count from information_schema.TABLES WHERE table_name ='{}'".format(table)
+        sql = "select count(*) as table_count from information_schema.TABLES WHERE table_schema='novel' and table_name ='{}'".format(table)
         res, dbout = self.mydb.execute(sql)
         if dbout[0].get("table_count"): return True
         sql = '''
