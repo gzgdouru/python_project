@@ -2,8 +2,8 @@
   "database": {
     "host": "localhost",
     "port": 3306,
-    "user": "root",
-    "passwd": "123456",
+    "user": "ouru",
+    "passwd": "!@#Test1992...",
     "db": "novel_collect",
     "charset": "utf8"
   },

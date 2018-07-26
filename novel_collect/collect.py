@@ -5,6 +5,7 @@ from mysql_ex import MysqlManager
 import threading, time
 import requests
 from bs4 import BeautifulSoup
+import zlib
 
 class Collect:
     def __init__(self, configFile="config.json"):
@@ -24,6 +25,23 @@ class Collect:
         try:
             self.make_main_table()
             self.make_chapter_table()
+
+            for novel in self.config.novels:
+                novelName = novel.get("name")
+                siteName = novel.get("site_name")
+                url = novel.get("url")
+                chapterTable = novel.get("chapter_table")
+
+                sql = "select count(*) as num from tb_novel where novel_name = '{}'".format(novelName)
+                result = self.mydb.execute(sql)
+                if result[1][0].get("num"): continue
+
+                sql = '''
+                insert into tb_novel(novel_name, site_name, url, chapter_table)
+                values('{}', '{}', '{}', '{}')
+                '''.format(novelName, siteName, url, chapterTable)
+                self.mydb.execute(sql)
+
             logger.info("init_novel() success.")
         except Exception as e:
             logger.error("init_novel() failed, error:{}".format(str(e)))
@@ -39,7 +57,7 @@ class Collect:
         create table tb_novel(
         id int auto_increment primary key,
         novel_name varchar(255) unique,
-        site_name varchar(255) unique,
+        site_name varchar(255),
         url varchar(255) unique,
         chapter_table varchar(64) unique
         )
@@ -63,7 +81,6 @@ class Collect:
             novel_id int,
             chapter_url varchar(255) unique,
             chapter_name varchar(255),
-            chapter_content text,
             foreign key (novel_id) references tb_novel(id) on delete cascade on update cascade
             )
             '''.format(chapterTable)
@@ -91,19 +108,24 @@ class Collect:
     def default_parse(self, url):
         try:
             chapters = []
+            tmpList = []
             respon = requests.get(url, headers={
                 'user-agent': 'Mozilla/5.0'
             }, timeout=10)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "lxml")
+            soup = BeautifulSoup(html, "html.parser")
             subNode = soup.body.dl
             for child in subNode.children:
                 try:
                     pos = child.a["href"].rfind(r"/")
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
                     charpterName = child.a.string
-                    chapters.append((chapterUrl, charpterName))
+
+                    # 去掉重复更新的章节
+                    if chapterUrl not in tmpList:
+                        chapters.append((chapterUrl, charpterName))
+                        tmpList.append(chapterUrl)
                 except:
                     pass
         except Exception as e:
@@ -121,18 +143,21 @@ class Collect:
             novelId = dbout[0].get("id")
 
             for chapter in chapters[::-1]:
-                sql = "select count(*) as num from {0} where chapter_url = {1}".format(table, chapter[0])
+                sql = "select count(*) as num from {0} where chapter_url = '{1}'".format(table, chapter[0])
                 res, dbout = self.mydb.execute(sql)
-                if dbout[0].get("num"): break   # 该章节已存在， 则代表其前面的章节已经保存到数据库中了， 直接退出
+                if dbout[0].get("num"):  # 该章节已存在， 则代表其前面的章节已经保存到数据库中了， 直接退出
+                    logger.info("{}-{} is already exist".format(novelName, chapter[1]))
+                    break
 
-                content = self.default_parse_content(chapter[0])
-                if not content: break   #章节内容还在手打中 下次运行再从新解析
+                # content = self.default_parse_content(chapter[0])
+                # if not content: break   #章节内容还在手打中 下次运行再从新解析
 
                 sql = '''
-                insert into {table}(novel_id, chapter_url, chapter_name, chapter_content)
-                values ({id}, '{url}', '{name}', '{content}')
-                '''.format(table=table, id=str(novelId), url=chapter[0], name=chapter[1], content=content)
+                insert into {table}(novel_id, chapter_url, chapter_name)
+                values ({id}, '{url}', '{name}')
+                '''.format(table=table, id=str(novelId), url=chapter[0], name=chapter[1])
                 self.mydb.execute(sql)
+                logger.info("save {}-{} success.".format(novelName, chapter[1]))
         except Exception as e:
             raise RuntimeError("save_chapter() error:{}".format(str(e)))
 
@@ -144,7 +169,7 @@ class Collect:
             }, timeout=30)
             respon.encoding = "gbk"
             html = respon.text
-            soup = BeautifulSoup(html, "lxml")
+            soup = BeautifulSoup(html, "html.parser")
             contentNode = soup.find(id="content")
             if contentNode.text: content = str(contentNode)
         except Exception as e:
