@@ -5,7 +5,7 @@ from mysql_ex import MysqlManager
 import threading, time
 import requests
 from bs4 import BeautifulSoup
-import zlib
+import json
 
 class Collect:
     def __init__(self, configFile="config.json"):
@@ -87,6 +87,15 @@ class Collect:
             res, dbout = self.mydb.execute(sql)
             if not res: raise RuntimeError("create {} failed!".format(chapterTable))
 
+    def show_config(self):
+        logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
+
+    def reset_config(self, confPath="config.json"):
+        logger.info("reload config....")
+        self.conf = ParseConfig(confPath)
+        self.init_database()
+        self.init_novel()
+
     def parse_novel(self):
         for novel in self.config.novels:
             thread = threading.Thread(target=self.parse_novel_thread, args=(novel,))
@@ -94,16 +103,21 @@ class Collect:
             thread.start()
 
     def parse_novel_thread(self, novel):
-        try:
-            if not novel.get("status"): return None #不启动解析直接返回
-            novelName = novel.get("name")
-            url = novel.get("url")
-            chapterTable = novel.get("chapter_table")
+        if not novel.get("status"): return None  # 不启动解析直接返回
+        novelName = novel.get("name")
+        url = novel.get("url")
+        chapterTable = novel.get("chapter_table")
+        logger.info("collect [{}] start.".format(novelName))
+        time_start = time.time()
 
+        try:
             chapters = self.default_parse(url)
             self.save_chapter(novelName, chapterTable, chapters)
         except Exception as e:
             logger.error("parse_novel_thread() failed, error:{}".format(str(e)))
+        finally:
+            time_end = time.time()
+            logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end-time_start))
 
     def default_parse(self, url):
         try:
@@ -122,7 +136,7 @@ class Collect:
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
                     charpterName = child.a.string
 
-                    # 去掉重复更新的章节
+                    #去掉重复更新的章节
                     if chapterUrl not in tmpList:
                         chapters.append((chapterUrl, charpterName))
                         tmpList.append(chapterUrl)
@@ -133,31 +147,29 @@ class Collect:
             chapters = None
         return chapters
 
-    def save_novel(self, novel):
-        pass
-
     def save_chapter(self, novelName, table, chapters):
         try:
+            urls = self.get_all_chapter_url(table)
+
             sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
             res, dbout = self.mydb.execute(sql)
             novelId = dbout[0].get("id")
 
-            for chapter in chapters[::-1]:
-                sql = "select count(*) as num from {0} where chapter_url = '{1}'".format(table, chapter[0])
-                res, dbout = self.mydb.execute(sql)
-                if dbout[0].get("num"):  # 该章节已存在， 则代表其前面的章节已经保存到数据库中了， 直接退出
-                    logger.info("{}-{} is already exist".format(novelName, chapter[1]))
-                    break
+            for chapter in chapters:
+                if chapter[0] in urls: continue
 
-                # content = self.default_parse_content(chapter[0])
-                # if not content: break   #章节内容还在手打中 下次运行再从新解析
+                # sql = "select count(*) as num from {0} where chapter_url = '{1}'".format(table, chapter[0])
+                # res, dbout = self.mydb.execute(sql)
+                # if dbout[0].get("num"):  # 该章节已存在， 则代表其前面的章节已经保存到数据库中了， 直接退出
+                #     logger.info("{}-{} is already exist".format(novelName, chapter[1]))
+                #     break
 
                 sql = '''
                 insert into {table}(novel_id, chapter_url, chapter_name)
                 values ({id}, '{url}', '{name}')
                 '''.format(table=table, id=str(novelId), url=chapter[0], name=chapter[1])
                 self.mydb.execute(sql)
-                logger.info("save {}-{} success.".format(novelName, chapter[1]))
+                logger.info("save [{}({})] success.".format(novelName, chapter[1]))
         except Exception as e:
             raise RuntimeError("save_chapter() error:{}".format(str(e)))
 
@@ -175,6 +187,12 @@ class Collect:
         except Exception as e:
             raise RuntimeError("default_parse_content():{}".format(str(e)))
         return content
+
+    def get_all_chapter_url(self, table):
+        sql = "select chapter_url from {}".format(table)
+        result = self.mydb.execute(sql)
+        urls = [dbout.get("chapter_url") for dbout in result[1] if dbout.get("chapter_url")]
+        return urls
 
     def run(self):
         while True:
