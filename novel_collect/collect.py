@@ -130,11 +130,7 @@ class Collect:
         names = []
         urls = []
         try:
-            respon = requests.get(url, headers={
-                'user-agent': 'Mozilla/5.0'
-            }, timeout=10)
-            respon.encoding = "gbk"
-            html = respon.text
+            html = self.get_html_text(url, encoding="gbk", timeout=15)
             soup = BeautifulSoup(html, "html.parser")
             subNode = soup.body.dl
             for child in subNode.children:
@@ -177,17 +173,20 @@ class Collect:
     def default_parse_content(self, url):
         content = None
         try:
-            respon = requests.get(url, headers={
-                'user-agent': 'Mozilla/5.0'
-            }, timeout=30)
-            respon.encoding = "gbk"
-            html = respon.text
+            html = self.get_html_text(url, encoding="gbk", timeout=15)
             soup = BeautifulSoup(html, "html.parser")
             contentNode = soup.find(id="content")
             if contentNode.text: content = str(contentNode)
         except Exception as e:
             raise RuntimeError("default_parse_content():{}".format(str(e)))
         return content
+
+    def get_html_text(self, url , encoding = "utf-8", timeout = None):
+        respon = requests.get(url, headers={
+            'user-agent': 'Mozilla/5.0'
+        }, timeout=timeout)
+        respon.encoding = encoding
+        return respon.text
 
     def get_all_chapter_url(self, table, novelId):
         sql = "select chapter_url from {} where novel_id = {}".format(table, novelId)
