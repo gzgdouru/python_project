@@ -30,16 +30,15 @@ class Collect:
                 novelName = novel.get("name")
                 siteName = novel.get("site_name")
                 url = novel.get("url")
-                chapterTable = novel.get("chapter_table")
 
                 sql = "select count(*) as num from tb_novel where novel_name = '{}'".format(novelName)
                 result = self.mydb.execute(sql)
                 if result[1][0].get("num"): continue
 
                 sql = '''
-                insert into tb_novel(novel_name, site_name, url, chapter_table)
-                values('{}', '{}', '{}', '{}')
-                '''.format(novelName, siteName, url, chapterTable)
+                insert into tb_novel(novel_name, site_name, url)
+                values('{}', '{}', '{}')
+                '''.format(novelName, siteName, url)
                 self.mydb.execute(sql)
 
             logger.info("init_novel() success.")
@@ -59,19 +58,18 @@ class Collect:
         novel_name varchar(255) unique,
         site_name varchar(255),
         url varchar(255) unique,
-        chapter_table varchar(64) unique
+        KEY idx_novel_name (novel_name) 
         )
         '''
         res, dbout = self.mydb.execute(sql)
         if not res: raise RuntimeError("make_main_table() failed!")
 
     def make_chapter_table(self):
-        for novel in self.config.novels[:]:
-            chapterTable = novel.get("chapter_table")
-            if not chapterTable: self.config.novels.remove(novel) #不解析没有配置表名的小说
+        for i in range(10):
+            tableName = "tb_chapter_{}".format(i)
 
             sql = "select count(*) as table_count from information_schema.TABLES " \
-                  "WHERE table_schema='novel_collect' and table_name ='{}'".format(chapterTable)
+                  "WHERE table_schema='novel_collect' and table_name ='{}'".format(tableName)
             res, dbout = self.mydb.execute(sql)
             if dbout[0].get("table_count"): continue
 
@@ -81,11 +79,12 @@ class Collect:
             novel_id int,
             chapter_url varchar(255) unique,
             chapter_name varchar(255),
+            KEY idx_novel_id (novel_id),
             foreign key (novel_id) references tb_novel(id) on delete cascade on update cascade
             )
-            '''.format(chapterTable)
+            '''.format(tableName)
             res, dbout = self.mydb.execute(sql)
-            if not res: raise RuntimeError("create {} failed!".format(chapterTable))
+            if not res: raise RuntimeError("create {} failed!".format(tableName))
 
     def show_config(self):
         logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
@@ -106,12 +105,12 @@ class Collect:
         if not novel.get("status"): return None  # 不启动解析直接返回
         novelName = novel.get("name")
         url = novel.get("url")
-        chapterTable = novel.get("chapter_table")
         logger.info("collect [{}] start.".format(novelName))
         time_start = time.time()
 
         try:
             chapters = self.default_parse(url)
+            chapterTable = self.get_chapter_table(novelName)
             self.save_chapter(novelName, chapterTable, chapters)
         except Exception as e:
             logger.error("parse_novel_thread() failed, error:{}".format(str(e)))
@@ -119,10 +118,18 @@ class Collect:
             time_end = time.time()
             logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end-time_start))
 
+    def get_chapter_table(self, novelName):
+        sql = "select id from tb_novel where novel_name = '{}'".format(novelName)
+        result = self.mydb.execute(sql)
+        novelId = result[1][0].get("id")
+
+        tableName = "tb_chapter_{}".format(novelId % 10)
+        return tableName
+
     def default_parse(self, url):
+        names = []
+        urls = []
         try:
-            chapters = []
-            tmpList = []
             respon = requests.get(url, headers={
                 'user-agent': 'Mozilla/5.0'
             }, timeout=10)
@@ -137,11 +144,11 @@ class Collect:
                     charpterName = child.a.string
 
                     #去掉重复更新的章节
-                    if chapterUrl not in tmpList:
-                        chapters.append((chapterUrl, charpterName))
-                        tmpList.append(chapterUrl)
-                except:
-                    pass
+                    if chapterUrl not in urls:
+                        names.append(charpterName)
+                        urls.append(chapterUrl)
+                except: pass
+                chapters = zip(urls, names)
         except Exception as e:
             logger.error("parse url:{0} failed, error:{1}".format(url, str(e)))
             chapters = None
@@ -149,27 +156,21 @@ class Collect:
 
     def save_chapter(self, novelName, table, chapters):
         try:
-            urls = self.get_all_chapter_url(table)
-
             sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
             res, dbout = self.mydb.execute(sql)
             novelId = dbout[0].get("id")
 
+            urls = self.get_all_chapter_url(table, novelId)
+
             for chapter in chapters:
                 if chapter[0] in urls: continue
-
-                # sql = "select count(*) as num from {0} where chapter_url = '{1}'".format(table, chapter[0])
-                # res, dbout = self.mydb.execute(sql)
-                # if dbout[0].get("num"):  # 该章节已存在， 则代表其前面的章节已经保存到数据库中了， 直接退出
-                #     logger.info("{}-{} is already exist".format(novelName, chapter[1]))
-                #     break
 
                 sql = '''
                 insert into {table}(novel_id, chapter_url, chapter_name)
                 values ({id}, '{url}', '{name}')
-                '''.format(table=table, id=str(novelId), url=chapter[0], name=chapter[1])
+                '''.format(table=table, id=novelId, url=chapter[0], name=chapter[1])
                 self.mydb.execute(sql)
-                logger.info("save [{}({})] success.".format(novelName, chapter[1]))
+                logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
         except Exception as e:
             raise RuntimeError("save_chapter() error:{}".format(str(e)))
 
@@ -188,8 +189,8 @@ class Collect:
             raise RuntimeError("default_parse_content():{}".format(str(e)))
         return content
 
-    def get_all_chapter_url(self, table):
-        sql = "select chapter_url from {}".format(table)
+    def get_all_chapter_url(self, table, novelId):
+        sql = "select chapter_url from {} where novel_id = {}".format(table, novelId)
         result = self.mydb.execute(sql)
         urls = [dbout.get("chapter_url") for dbout in result[1] if dbout.get("chapter_url")]
         return urls
