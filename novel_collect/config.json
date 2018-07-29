@@ -1,6 +1,6 @@
 {
   "database": {
-    "host": "localhost",
+    "host": "193.112.150.18",
     "port": 3306,
     "user": "ouru",
     "passwd": "!@#Test1992...",
@@ -11,9 +11,59 @@
   "novel": [
     {
       "name": "全职法师",
-      "site_name": "顶点中文网",
+      "site_name": "顶点小说",
+      "category" : "玄幻",
+      "author" : "乱",
       "url": "https://www.cangqionglongqi.com/quanzhifashi/",
       "status": 1
-    }
+    },
+	{
+		"name": "学霸的黑科技系统",
+		"site_name": "笔趣阁",
+        "category" : "都市",
+        "author" : "晨星LL",
+		"url": "http://www.biqugexsw.com/53_53457/",
+		"status": 1
+	},
+	{
+		"name": "极道天魔",
+		"site_name": "笔趣阁",
+        "category" : "修真",
+        "author" : "滚开",
+		"url": "https://www.kuxiaoshuo.com/3_3610/",
+		"status": 1
+	},
+	{
+		"name": "牧神记",
+		"site_name": "笔趣阁",
+        "category" : "其他",
+        "author" : "宅猪",
+		"url": "http://www.cdzdgw.com/4_4103/",
+		"status": 1
+	},
+    {
+		"name": "琴帝",
+		"site_name": "顶点小说",
+        "category" : "玄幻",
+        "author" : "唐家三少",
+		"url": "https://www.booktxt.net/1_1704/",
+		"status": 1
+	},
+    {
+		"name": "斗破苍穹",
+		"site_name": "顶点小说",
+        "category" : "玄幻",
+        "author" : "天蚕土豆",
+		"url": "https://www.booktxt.net/1_1600/",
+		"status": 1
+	},
+     {
+		"name": "近身保镖",
+		"site_name": "顶点小说",
+        "category" : "都市",
+        "author" : "柳下挥",
+		"url": "http://www.booktxt.com/0_778/",
+		"status": 1
+	}
   ]
 }
