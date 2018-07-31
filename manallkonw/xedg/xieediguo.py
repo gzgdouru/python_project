@@ -9,12 +9,13 @@ from compressFile import ZipCompress
 import shutil
 
 class XEDGParser:
-    def __init__(self, url, encoding="utf-8", timeout=60, dataDir=".", threadCount=15):
+    def __init__(self, url, encoding="utf-8", timeout=60, dataDir=".", threadCount=15, isZip=False):
         self.url = url
         self.encoding = encoding
         self.timeout = timeout
         self.dataDir = dataDir
         self.threadCount = threadCount
+        self.isZip = isZip
         self.linkQueue = Queue()
         self.load_filter()
 
@@ -59,7 +60,7 @@ class XEDGParser:
             start_time = time.time()
 
             # 创建目录
-            if os.path.exists(dirName) or os.path.exists("{}.zip".format(dirName)):
+            if os.path.exists("{}_done".format(dirName)) or os.path.exists("{}.zip".format(dirName)):
                 logger.info("{} is already exist.".format(dirName))
                 return
             else:
@@ -84,9 +85,12 @@ class XEDGParser:
                     logger.error("->save url:{} error:{}".format(parseUrl, str(e)))
                     break
 
-            # 解析完成后压缩文件夹
-            ZipCompress.zip_file(dirName, "{}.zip".format(dirName))
-            shutil.rmtree(dirName)  # 压缩完成, 删除源文件夹
+            if self.isZip:
+                # 解析完成后压缩文件夹
+                ZipCompress.zip_file(dirName, "{}.zip".format(dirName))
+                shutil.rmtree(dirName)  # 压缩完成, 删除源文件夹
+            else:
+                os.rename(dirName, "{}_done".format(dirName))
 
             end_time = time.time()
             logger.info("parse [{}] finish, 耗时:{}".format(link[0], end_time - start_time))
@@ -105,9 +109,10 @@ class XEDGParser:
 
     def make_dir(self, dirName):
         try:
+            if os.path.exists(dirName): shutil.rmtree(dirName)
             os.makedirs(dirName)
         except Exception as e:
-            dirName = datetime.now().strftime("%Y%m%d%H%M")
+            dirName = "{}/{}".format(self.dataDir, datetime.now().strftime("%Y%m%d%H%M"))
             os.makedirs(dirName)
 
     def get_link(self, html):
