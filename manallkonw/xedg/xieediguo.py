@@ -53,18 +53,18 @@ class XEDGParser:
                 continue
 
             dirName = self.dir_format(link[0])
-            parseUrl = link[1]
-            index = 0
-
-            logger.info("parse [{}] start...".format(link[0]))
-            start_time = time.time()
-
             # 创建目录
-            if os.path.exists("{}_done".format(dirName)) or os.path.exists("{}.zip".format(dirName)):
+            if (os.path.exists("{}_done".format(dirName)) and os.listdir("{}_done".format(dirName))) \
+                    or os.path.exists("{}.zip".format(dirName)):
                 logger.info("{} is already exist.".format(dirName))
                 return
             else:
                 self.make_dir(dirName)
+
+            parseUrl = link[1]
+            index = 0
+            logger.info("parse [{}] start...".format(link[0]))
+            start_time = time.time()
 
             # 解析内容
             while True:
@@ -110,6 +110,7 @@ class XEDGParser:
     def make_dir(self, dirName):
         try:
             if os.path.exists(dirName): shutil.rmtree(dirName)
+            if os.path.exists("{}_done".format(dirName)) : shutil.rmtree("{}_done".format(dirName))
             os.makedirs(dirName)
         except Exception as e:
             dirName = "{}/{}".format(self.dataDir, datetime.now().strftime("%Y%m%d%H%M"))
