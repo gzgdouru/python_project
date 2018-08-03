@@ -54,6 +54,7 @@ class XEDGParser:
 
             dirName = self.dir_format(link[0])
             # 创建目录
+            #目录存在并且不为空 或者已经压缩了, 就不再重新解析
             if (os.path.exists("{}_done".format(dirName)) and os.listdir("{}_done".format(dirName))) \
                     or os.path.exists("{}.zip".format(dirName)):
                 logger.info("{} is already exist.".format(dirName))
