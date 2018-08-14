@@ -164,15 +164,9 @@ class UpdateNotice:
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
                     chapterName = child.a.string
 
-                    # 去掉重复更新的章节
-                    if chapters:
-                        if chapterUrl != chapters[-1][0]: chapters.append((chapterUrl, chapterName))
-                    else:
+                    # 去掉连续重复更新的章节
+                    if not chapters or chapterUrl != chapters[-1][0]:
                         chapters.append((chapterUrl, chapterName))
-
-                    # if chapterUrl not in urls:
-                    #     names.append(chapterName)
-                    #     urls.append(chapterUrl)
                 except:
                     pass
         except Exception as e:
