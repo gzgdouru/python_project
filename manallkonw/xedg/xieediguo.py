@@ -7,6 +7,7 @@ import threading
 from datetime import datetime
 from compressFile import ZipCompress
 import shutil
+import uuid
 
 class XEDGParser:
     def __init__(self, url, encoding="utf-8", timeout=60, dataDir=".", threadCount=15, isZip=False):
@@ -57,7 +58,7 @@ class XEDGParser:
             if (os.path.exists("{}_done".format(dirName)) and os.listdir("{}_done".format(dirName))) \
                     or os.path.exists("{}.zip".format(dirName)):
                 logger.info("{} is already exist.".format(dirName))
-                return
+                continue
             else:
                 self.make_dir(dirName)
 
@@ -113,7 +114,8 @@ class XEDGParser:
             if os.path.exists("{}_done".format(dirName)) : shutil.rmtree("{}_done".format(dirName))
             os.makedirs(dirName)
         except Exception as e:
-            dirName = "{}/{}".format(self.dataDir, datetime.now().strftime("%Y%m%d%H%M"))
+            # dirName = "{}/{}".format(self.dataDir, datetime.now().strftime("%Y%m%d%H%M"))
+            dirName = str(uuid.uuid1())
             os.makedirs(dirName)
 
     def get_link(self, html):
