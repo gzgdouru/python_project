@@ -28,7 +28,7 @@ class Parser:
                         urls.append(chapterUrl)
                 except:
                     pass
-                chapters = zip(urls, names)
+            chapters = zip(urls, names)
         except Exception as e:
             raise RuntimeError("->paser_chapter({}) error:{}".format(self.url, str(e)))
             chapters = None
