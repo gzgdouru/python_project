@@ -1,0 +1,13 @@
+DATABASE:
+  host: "193.112.150.18"
+  port: 3306
+  user: "ouru"
+  password: "!@#Test1992..."
+  db_name: "novel"
+  charset : "utf8"
+
+SERVER:
+  username : "ouru"
+  is_popup : 1  # 是否弹窗提醒
+  popup_time : 1  # 弹窗时长, 单位小时
+

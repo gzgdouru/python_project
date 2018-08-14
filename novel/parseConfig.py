@@ -3,7 +3,7 @@ import json
 class ParseConfig(object):
     def __init__(self, filePath="novelConfig.json"):
         self.data = json.loads(open(filePath, encoding="utf-8").read())
-        self.email = None
+        self.emails = None
         self.novel = []
         self.database = None
         self.parse()
@@ -14,7 +14,7 @@ class ParseConfig(object):
         self.paser_novel()
 
     def parse_email(self):
-        self.email = self.data.get("email")
+        self.emails = self.data.get("emails")
 
     def parse_database(self):
         self.database = self.data.get("database")

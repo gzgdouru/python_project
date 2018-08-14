@@ -1,41 +1,55 @@
 {
-  "email" : {
-    "smtp_server" : "smtp.163.com",
-    "sender" : "18719091650@163.com",
-    "sender_passwd" : "qq5201314ouru",
-    "charset" : "utf-8"
-  },
-
-  "database" : {
-    "host": "localhost",
-    "port": 3306,
-    "user" : "root",
-    "passwd" : "123456",
-    "db" : "novel",
-    "charset" : "utf8"
-  },
-
-  "novel" : [
+  "emails": [
     {
-      "name" : "全职法师",
-      "table" : "tb_full_time_mage",
-      "site" : [
+      "smtp_server": "smtp.163.com",
+      "sender": "anjubaoouru@163.com",
+      "sender_passwd": "qq5201314ouru",
+      "charset": "utf-8"
+    },
+    {
+      "smtp_server": "smtp.163.com",
+      "sender": "gzouru@163.com",
+      "sender_passwd": "qq5201314ouru",
+      "charset": "utf-8"
+    },
+    {
+      "smtp_server": "smtp.163.com",
+      "sender": "18719091650@163.com",
+      "sender_passwd": "qq5201314ouru",
+      "charset": "utf-8"
+    }
+  ],
+
+  "database": {
+    "host": "193.112.150.18",
+    "port": 3306,
+    "user": "ouru",
+    "passwd": "!@#Test1992...",
+    "db": "ourutest",
+    "charset": "utf8"
+  },
+
+  "novel": [
+    {
+      "name": "全职法师",
+      "table": "tb_full_time_mage",
+      "site": [
         {
-          "name" : "笔趣阁",
-          "url" : "http://www.booktxt.net/0_595/",
-          "status" : 0
+          "name": "笔趣阁",
+          "url": "http://www.booktxt.net/0_595/",
+          "status": 0
         },
         {
-          "name" : "顶点中文网",
-          "url" :  "https://www.cangqionglongqi.com/quanzhifashi/",
-          "status" : 1
+          "name": "顶点中文网",
+          "url": "https://www.cangqionglongqi.com/quanzhifashi/",
+          "status": 1
         }
       ],
-      "receiver" : [
-       "gzgdouru@163.com"
+      "receiver": [
+        "gzgdouru@163.com"
       ],
-      "status" : 1,
-      "send_content" : 1
+      "status": 1,
+      "send_content": 1
     }
   ]
 }

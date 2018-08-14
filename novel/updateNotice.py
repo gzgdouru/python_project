@@ -8,11 +8,11 @@ from mysql_ex import MysqlManager
 from parseConfig import ParseConfig
 import threading
 from novelLog import logger
+from operator  import itemgetter
 
 class UpdateNotice:
     def __init__(self, confPath="novelConfig.json"):
         self.conf = ParseConfig(confPath)
-        self.init_email()
         self.init_database()
         self.init_novel()
         self.lock = threading.Lock()
@@ -26,18 +26,6 @@ class UpdateNotice:
             "笔趣阁": self.default_parse_content,
             "顶点中文网": self.default_parse_content,
         }
-
-    def init_email(self):
-        try:
-            smtpServer = self.conf.email.get("smtp_server")
-            sender = self.conf.email.get("sender")
-            passwd = self.conf.email.get("sender_passwd")
-            charset = self.conf.email.get("charset")
-            self.myemail = MyEmail(smtpServer, sender, passwd, charset=charset)
-            logger.info("init_email() success.")
-        except Exception as e:
-            logger.error("init_email() error:{}".format(str(e)))
-            sys.exit(-1)
 
     def init_database(self):
         try:
@@ -55,7 +43,6 @@ class UpdateNotice:
                 table = novel.get("table")
                 if self.make_table(table):
                     self.novelList.append(novel)
-                    continue
                 else:
                     logger.error("init_novel() error:创建表{}失败!".format(table))
                     sys.exit(-1)
@@ -67,7 +54,6 @@ class UpdateNotice:
     def reset_config(self, confPath="novelConfig.json"):
         logger.info("reload config....")
         self.conf = ParseConfig(confPath)
-        self.init_email()
         self.init_database()
         self.init_novel()
 
@@ -75,11 +61,8 @@ class UpdateNotice:
         logger.info(json.dumps(self.conf.data, indent=2, ensure_ascii=False))
 
     def make_table(self, table):
-        sql = "select count(*) as table_count from information_schema.TABLES WHERE table_schema='novel' and table_name ='{}'".format(table)
-        res, dbout = self.mydb.execute(sql)
-        if dbout[0].get("table_count"): return True
         sql = '''
-            create table {table_name} (
+            create table if NOT EXISTS {table_name} (
               id int primary key AUTO_INCREMENT,
               site varchar(255) UNIQUE,
               site_name varchar(255),
@@ -89,8 +72,8 @@ class UpdateNotice:
               KEY idx_chapter_name (chapter_name)
             );
             '''.format(table_name=table)
-        res, dbout = self.mydb.execute(sql)
-        return res
+        result = self.mydb.execute(sql)
+        return result[0]
 
     def get_all_chapter(self, table):
         sql = "select name from {}".format(table)
@@ -98,10 +81,19 @@ class UpdateNotice:
         allChapter = [chapter.get("name") for chapter in dbout]
         return allChapter
 
-    def send_email(self, receiver, subject, content, mimeType="plain"):
+    def send_email(self, **kwargs):
         with self.lock:
-            self.myemail.set_receiver(receiver)
-            stderr = self.myemail.send_email(subject, content, mimeType=mimeType)
+            smtpServer = kwargs.get("smtp_server")
+            sender = kwargs.get("sender")
+            passwd = kwargs.get("sender_passwd")
+            charset = kwargs.get("charset")
+            receiver = kwargs.get("receiver")
+            subject = kwargs.get("subject")
+            content = kwargs.get("content")
+            mimeType = kwargs.get("mimeType")
+
+            myemail = MyEmail(smtpServer, sender, passwd, receiver, charset=charset)
+            stderr = myemail.send_email(subject, content, mimeType=mimeType)
         return stderr
 
     def parse_novel_thread(self, novel):
@@ -111,8 +103,8 @@ class UpdateNotice:
         receiver = novel.get("receiver")
         sendContent = novel.get("send_content")
 
-        try:
-            for site in siteList:
+        for site in siteList:
+            try:
                 if not site.get("status"): continue
                 siteName = site.get("name")
                 parseFunc = self.parseMethod.get(siteName, self.default_parse)
@@ -125,8 +117,8 @@ class UpdateNotice:
                     break
                 else:
                     logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, chapters[-1][1]))
-        except Exception as e:
-            logger.error("parse_novel_thread({0}) error:{1}".format(novelName, str(e)))
+            except Exception as e:
+                logger.error("parse_novel_thread({0}) error:{1}".format(site.get("url"), str(e)))
 
     def parse_novel(self):
         threads = []
@@ -154,8 +146,9 @@ class UpdateNotice:
         return False
 
     def default_parse(self, site):
-        name = site.get("name")
         url = site.get("url")
+        names = []
+        urls = []
         chapters = []
         try:
             respon = requests.get(url, headers={
@@ -169,22 +162,26 @@ class UpdateNotice:
                 try:
                     pos = child.a["href"].rfind(r"/")
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
-                    charpter = child.a.string
+                    chapterName = child.a.string
 
                     # 去掉重复更新的章节
                     if chapters:
-                        if chapterUrl != chapters[-1][0]: chapters.append((chapterUrl, charpter))
+                        if chapterUrl != chapters[-1][0]: chapters.append((chapterUrl, chapterName))
                     else:
-                        chapters.append((chapterUrl, charpter))
+                        chapters.append((chapterUrl, chapterName))
+
+                    # if chapterUrl not in urls:
+                    #     names.append(chapterName)
+                    #     urls.append(chapterUrl)
                 except:
                     pass
         except Exception as e:
-            logger.error("parse() {site_name} {site_url} error:{errinfo}".format(site_name=name, site_url=url, errinfo=str(e)))
+            logger.error("parse() {site_name} {site_url} error:{errinfo}".format(site_name=site.get("name"), site_url=url, errinfo=str(e)))
             chapters = None
         return chapters
 
     def default_parse_content(self, url):
-        content = stderr = None
+        content = None
         try:
             respon = requests.get(url, headers={
                 'user-agent': 'Mozilla/5.0'
@@ -195,8 +192,8 @@ class UpdateNotice:
             contentNode = soup.find(id="content")
             if contentNode.text: content = str(contentNode)
         except Exception as e:
-            stderr = str(e)
-        return content, stderr
+           raise RuntimeError("default_parse_content({0}) error:{1}".format(url), str(e))
+        return content
 
     def send_chapter(self, table, chapter, novelName, siteName, receiver):
         if not self.save_chapter(siteName, chapter, table): return None
@@ -219,19 +216,27 @@ class UpdateNotice:
             chapterName = self.get_chapter_name(chapter[1])
             if self.chapter_is_exist(chapter, table) or (not self.save_chapter(siteName, chapter, table)): break
             parseContentFunc = self.parseContentMethod.get(siteName, self.default_parse_content)
-            content, stderr = parseContentFunc(url)
+            content = parseContentFunc(url)
             if content:
                 content = "<h3>{0}</h3>{1}".format(chapter[1], content)
                 subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter[1])
 
                 # 邮件发送失败只输出错误, 不重新发送该章节
-                stderr = self.send_email(receiver, subject, content, mimeType="html")
-                if not stderr:
-                    logger.info("{0} send email to {1} success.".format(subject, str(receiver)))
-                else:
-                    logger.error("{0} send email to {1} failed!, error:{2}".format(subject, str(receiver), stderr))
-            elif stderr:     # 解析网页出错
-                logger.error("paser url:{0} failed, error:{1}".format(url, stderr))
+                receiverList = self.list_split(receiver, nums=30) # 一封邮件最多有三十个收件人
+                for to in receiverList:
+                    # 对于发送失败的邮件, 换个发送人再次发送
+                    for myemail in self.conf.emails:
+                        myemail["receiver"] = to
+                        myemail["subject"] = subject
+                        myemail["content"] = content
+                        myemail["mimeType"] = "html"
+
+                        stderr = self.send_email(**myemail)
+                        if not stderr:
+                            logger.info("({0})[{1}] send email to {2} success.".format(subject, myemail.get("sender"), str(receiver)))
+                            break
+                        else:
+                            logger.error("({0})[{1}] send email to {2} failed!, error:{3}".format(subject, myemail.get("sender"), str(receiver), stderr))
             else:    # 内容还没更新, 下次再次解析
                 sql = "delete from {0} where site='{1}'".format(table, chapter[0])
                 self.mydb.execute(sql)
@@ -244,6 +249,15 @@ class UpdateNotice:
 
     def get_chapter_name(self, chapter):
         return chapter.split(" ")[1].strip()
+
+    def list_split(self, srcList, nums=30):
+        outList = []
+        tmpList = srcList[:]
+        while len(tmpList) > nums:
+            outList.append(tmpList[:nums])
+            tmpList = tmpList[nums:]
+        if tmpList: outList.append(tmpList)
+        return outList
 
     def run(self):
         while True:
