@@ -1,7 +1,7 @@
 import os, sys
 from parseConfig import ParseConfig
 from novelLog import logger
-from mysql_ex import MysqlManager
+from mysqlV1 import MysqlManager
 import threading, time
 import requests
 from bs4 import BeautifulSoup
@@ -26,11 +26,10 @@ class Collect:
     def init_novel(self):
         logger.info("init_novel() start...")
         try:
-            self.make_main_table()
-            self.make_chapter_table()
+            self.check_main_table()
+            self.check_chapter_table()
 
             for novel in self.config.novels[:]:
-                category = novel.get("category")
                 url = novel.get("url")
                 novelName = novel.get("name")
 
@@ -39,98 +38,48 @@ class Collect:
                     logger.info("{}({})不能解析, 请选择另外的网站, 首选顶点小说, 次选笔趣阁!".format(novelName, url))
                     self.config.novels.remove(novel)
                     continue
+                else:
+                    self.save_novel_info(novel)
 
-                self.save_category(category)
-                self.save_novel_info(novel)
             logger.info("init_novel() success.")
         except Exception as e:
             logger.error("init_novel() failed, error:{}".format(str(e)))
             sys.exit(-1)
 
-    def make_main_table(self):
-        try:
-            # 创建 tb_category 表
-            sql = '''
-                   create table if NOT EXISTS tb_category(
-                   id int auto_increment primary key,
-                   name varchar(64) UNIQUE 
-                   )
-                   '''
-            result = self.mydb.execute(sql)
-            if not result[0]: raise RuntimeError("make_main_table() failed!->")
-
-            # 创建 tb_novel 表
-            sql = '''
-            create table if NOT EXISTS tb_novel(
-            id int auto_increment primary key,
-            novel_name varchar(255) unique,
-            site_name varchar(255),
-            author VARCHAR(64),
-            category_id int,
-            url varchar(255) unique,
-            KEY idx_novel_name (novel_name),
-            foreign key (category_id) references tb_category(id) on delete cascade on update cascade
-            )
-            '''
-            result = self.mydb.execute(sql)
-            if not result[0]: raise RuntimeError("make_main_table() failed!->")
-        except Exception as e:
-            raise RuntimeError("make_main_table() error:{}|".format(str(e)))
-
-    def make_chapter_table(self):
-        try:
-            for i in range(10):
-                tableName = "tb_chapter_{}".format(i)
-
-                sql = "select count(*) as table_count from information_schema.TABLES " \
-                      "WHERE table_schema='novel_collect' and table_name ='{}'".format(tableName)
-                res, dbout = self.mydb.execute(sql)
-                if dbout[0].get("table_count"): continue
-
-                sql = '''
-                create table {0}(
-                id int auto_increment primary key,
-                novel_id int,
-                chapter_url varchar(255) unique,
-                chapter_name varchar(255),
-                KEY idx_novel_id (novel_id),
-                foreign key (novel_id) references tb_novel(id) on delete cascade on update cascade
-                )
-                '''.format(tableName)
-                res, dbout = self.mydb.execute(sql)
-                if not res: raise RuntimeError("create {} failed!".format(tableName))
-        except Exception as e:
-            raise RuntimeError("make_chapter_table() error:{}|".format(str(e)))
-
-    def save_category(self, category):
-        sql = '''
-        insert into tb_category(name)
-        select '{0}' from dual
-        where not EXISTS (select 1 from tb_category where name = '{0}')
-        '''.format(category)
+    def check_main_table(self):
+        # 检查 tb_novel_category 表是否存在
+        sql = "select t.table_name from information_schema.TABLES t where t.TABLE_SCHEMA = 'novel_site' and t.TABLE_NAME ='tb_novel_category'"
         result = self.mydb.execute(sql)
-        if not result[0]: raise RuntimeError("save_category() failed!")
+        if not result: raise RuntimeError("表数据表[tb_novel_category]不存在")
 
-    def get_category_id(self, category):
-        sql = "select id from tb_category where name = '{}'".format(category)
+        # 检查 tb_novel 表是否存在
+        sql = "select t.table_name from information_schema.TABLES t where t.TABLE_SCHEMA = 'novel_site' and t.TABLE_NAME ='tb_novel'"
         result = self.mydb.execute(sql)
-        return result[1][0].get("id")
+        if not result: raise RuntimeError("表数据表[tb_novel]不存在")
+
+    def check_chapter_table(self):
+        for i in range(10):
+            tableName = "tb_chapter_{}".format(i)
+            sql = "select t.table_name from information_schema.TABLES t where t.TABLE_SCHEMA = 'novel_site' and t.TABLE_NAME ='{}'".format(
+                tableName)
+            result = self.mydb.execute(sql)
+            if not result: raise RuntimeError("数据表[{}]不存在!".format(tableName))
+        return True
 
     def save_novel_info(self, novel):
         novelName = novel.get("name")
         siteName = novel.get("site_name")
         url = novel.get("url")
-        author = novel.get("author")
-        category = novel.get("category")
-        categoryId = self.get_category_id(category)
+
+        sql = "select count(*) as nums from tb_novel where novel_name = '{0}'".format(novelName)
+        result = self.mydb.execute(sql)
+        if result[0].get("nums"): return    #已保存的小说直接返回
 
         sql = '''
-        insert into tb_novel(novel_name, site_name, author, category_id, url)
-        select '{0}', '{1}', '{2}', {3}, '{4}' from dual
-        where NOT EXISTS (select 1 from tb_novel where novel_name = '{0}')
-        '''.format(novelName, siteName, author, categoryId, url)
-        result = self.mydb.execute(sql)
-        if not result[0]: raise RuntimeError("save_novel_info() failed!")
+        insert into tb_novel(novel_name, site_name, url, add_time)
+        values('{0}', '{1}', '{2}', now())
+        '''.format(novelName, siteName, url)
+        self.mydb.execute(sql)
 
     def show_config(self):
         logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
@@ -168,7 +117,7 @@ class Collect:
     def get_chapter_table(self, novelName):
         sql = "select id from tb_novel where novel_name = '{}'".format(novelName)
         result = self.mydb.execute(sql)
-        novelId = result[1][0].get("id")
+        novelId = result[0].get("id")
 
         tableName = "tb_chapter_{}".format(novelId % 10)
         return tableName
@@ -180,7 +129,7 @@ class Collect:
             sql = "select count(*) as num from tb_novel where url = '{}'".format(url)
             result = self.mydb.execute(sql)
 
-            if not result[1][0].get("num"):
+            if not result[0].get("num"):
                 result = True if Parser(url, encoding="gbk").parse_chapter() else False
         except Exception as e:
             logger.error("->parse_test({}) error:{}".format(novel.get("name"), str(e)))
@@ -190,8 +139,8 @@ class Collect:
     def save_chapter(self, novelName, table, chapters):
         try:
             sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
-            res, dbout = self.mydb.execute(sql)
-            novelId = dbout[0].get("id")
+            result = self.mydb.execute(sql)
+            novelId = result[0].get("id")
 
             urls = self.get_all_chapter_url(table, novelId)
 
@@ -199,8 +148,8 @@ class Collect:
                 if chapter[0] in urls: continue
 
                 sql = '''
-                insert into {table}(novel_id, chapter_url, chapter_name)
-                values ({id}, '{url}', '{name}')
+                insert into {table}(novel_id, chapter_url, chapter_name, add_time)
+                values ({id}, '{url}', '{name}', now())
                 '''.format(table=table, id=novelId, url=chapter[0], name=chapter[1])
                 self.mydb.execute(sql)
                 logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
@@ -208,9 +157,11 @@ class Collect:
             raise RuntimeError("save_chapter() error:{}".format(str(e)))
 
     def get_all_chapter_url(self, table, novelId):
-        sql = "select chapter_url from {} where novel_id = {}".format(table, novelId)
+        sql = "select chapter_url from {0} where novel_id = {1}".format(table, novelId)
         result = self.mydb.execute(sql)
-        urls = [dbout.get("chapter_url") for dbout in result[1] if dbout.get("chapter_url")]
+        if not result: return []
+
+        urls = [dbout.get("chapter_url") for dbout in result if dbout.get("chapter_url")]
         return urls
 
     def run(self):
