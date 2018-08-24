@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, re
 from parseConfig import ParseConfig
 from novelLog import logger
 from mysqlV1 import MysqlManager
@@ -148,9 +148,9 @@ class Collect:
                 if chapter[0] in urls: continue
 
                 sql = '''
-                insert into {table}(novel_id, chapter_url, chapter_name, add_time)
-                values ({id}, '{url}', '{name}', now())
-                '''.format(table=table, id=novelId, url=chapter[0], name=chapter[1])
+                insert into {table}(novel_id, chapter_url, chapter_index, chapter_name, add_time)
+                values ({id}, '{url}', {index}, '{name}', now())
+                '''.format(table=table, id=novelId, url=chapter[0], index=self.get_chapter_index(chapter[0]), name=chapter[1])
                 self.mydb.execute(sql)
                 logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
         except Exception as e:
@@ -163,6 +163,11 @@ class Collect:
 
         urls = [dbout.get("chapter_url") for dbout in result if dbout.get("chapter_url")]
         return urls
+
+    def get_chapter_index(self, chapterUrl):
+        pos = chapterUrl.rfind("/")
+        chapterIndex = re.match(r"\d+", chapterUrl[pos+1:]).group()
+        return int(chapterIndex)
 
     def run(self):
         while True:
