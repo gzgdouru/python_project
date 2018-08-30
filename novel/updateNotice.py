@@ -1,14 +1,18 @@
 import time, sys, json, requests, smtplib
 from email.mime.text import MIMEText
 from email.header import Header
-from bs4 import BeautifulSoup
 from datetime import datetime
+import threading
+from operator import itemgetter
+from collections import OrderedDict
+
+from bs4 import BeautifulSoup
+
 from myEmail import MyEmail
 from mysqlV1 import MysqlManager
 from parseConfig import ParseConfig
-import threading
 from novelLog import logger
-from operator import itemgetter
+
 
 class UpdateNotice:
     def __init__(self, confPath="novelConfig.json"):
@@ -109,15 +113,17 @@ class UpdateNotice:
                 siteName = site.get("name")
                 parseFunc = self.parseMethod.get(siteName, self.default_parse)
                 chapters = parseFunc(site)
-                if chapters and not self.chapter_is_exist(chapters[-1], table):
+                lastChapterUrl, lastChapterName = chapters.popitem()
+                if not self.chapter_is_exist((lastChapterUrl, lastChapterName), table):
+                    chapters[lastChapterUrl] = lastChapterName
                     if sendContent:
                         self.send_chapter_has_content(table, chapters, novelName, siteName, receiver)
                     else:
-                        self.send_chapter(table, chapters[-1], novelName, siteName, receiver)
-                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, chapters[-1][1]))
+                        self.send_chapter(table, (lastChapterUrl, lastChapterName), novelName, siteName, receiver)
+                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, lastChapterName))
                     break
                 else:
-                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, chapters[-1][1]))
+                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, lastChapterName))
             except Exception as e:
                 logger.error("parse_novel_thread({0}) failed, error:[{1}]".format(site.get("url"), str(e)))
 
@@ -146,8 +152,9 @@ class UpdateNotice:
 
     def default_parse(self, site):
         url = site.get("url")
-        chapters = []
+        chapters = OrderedDict()
         try:
+            timeStart = time.time()
             html = self.get_html_text(url, encode="gbk")
             soup = BeautifulSoup(html, "html.parser")
             subNode = soup.body.dl
@@ -157,11 +164,15 @@ class UpdateNotice:
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos+1:])
                     chapterName = child.a.string
 
-                    # 去掉连续重复更新的章节
-                    if not chapters or chapterUrl != chapters[-1][0]:
-                        chapters.append((chapterUrl, chapterName))
+                    #去掉重复的章节
+                    if chapterUrl in chapters:
+                        chapters.move_to_end(chapterUrl)
+                    else:
+                        chapters[chapterUrl] = chapterName
                 except:
                     pass
+            timeEnd = time.time()
+            logger.info("parse {0} finish, 耗时:{1}".format(url, timeEnd - timeStart))
         except Exception as e:
             logger.error("parse ({0} failed, error:[{1}])".format(url, str(e)))
             chapters = None
@@ -188,27 +199,30 @@ class UpdateNotice:
         self.send(receiver, subject, content)
 
     def send_chapter_has_content(self, table, chapters, novelName, siteName, receiver):
-        if not self.get_record_count(table): chapters = chapters[-1:]    #如果表中没有数据, 则只发送最新一章
-        timeCount = 1
-        for chapter in chapters[::-1]:
-            if timeCount > 3: break # 每次最多发送3封邮件
-            timeCount += 1
+        sendCount = 3  # 每次最多发送3封邮件, 避免邮件轰炸
+        if not self.get_record_count(table):
+            sendCount = 1  # 如果表中没有数据, 则只发送最新一章
 
-            url = chapter[0]
+        while sendCount > 0:
+            sendCount -= 1
+            chapter = chapters.popitem()
             chapterName = self.get_chapter_name(chapter[1])
-            if self.chapter_is_exist(chapter, table) or (not self.save_chapter(siteName, chapter, table)): break
+            if self.chapter_is_exist(chapter, table) or (not self.save_chapter(siteName, chapter, table)):
+                break
+
+            chapterUrl, chapterName = chapter
             parseContentFunc = self.parseContentMethod.get(siteName, self.default_parse_content)
-            content = parseContentFunc(url)
+            content = parseContentFunc(chapterUrl)
             if content:
-                content = "<h3>{0}</h3>{1}".format(chapter[1], content)
-                subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapter[1])
+                content = "<h3>{0}</h3>{1}".format(chapterName, content)
+                subject = "小说更新提醒({0}-{1}-{2})".format(novelName, siteName, chapterName)
 
                 # 邮件发送失败只输出错误, 不重新发送该章节
                 self.send(receiver, subject, content, mimeType="html")
-            else:    # 内容还没更新, 下次再次解析
-                sql = "delete from {0} where site='{1}'".format(table, chapter[0])
+            else:  # 内容还没更新, 下次再次解析
+                sql = "delete from {0} where site='{1}'".format(table, chapterUrl)
                 self.mydb.execute(sql)
-                logger.info("{0}-{1}-{2}, 内容尚未更新.".format(novelName, siteName, chapter[1]))
+                logger.info("{0}-{1}-{2}, 内容尚未更新.".format(novelName, siteName, chapterName))
 
     def send(self, receivers, subject, content, mimeType="plain"):
         receiverList = self.list_split(receivers, nums=30)  # 一封邮件最多有三十个收件人
