@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 
-class Parser:
+
+class BiQuGeParser:
     def __init__(self, url, encoding="utf-8", timeout=15):
         self.url = url
         self.encoding = encoding
@@ -30,7 +31,7 @@ class Parser:
                     pass
             chapters = zip(urls, names)
         except Exception as e:
-            raise RuntimeError("->paser_chapter({}) error:{}".format(self.url, str(e)))
+            raise RuntimeError("paser_chapter({}) error:{}\n".format(self.url, str(e)))
             chapters = None
         return chapters
 
@@ -43,3 +44,19 @@ class Parser:
         }, timeout=self.timeout)
         respon.encoding = self.encoding
         return respon.text
+
+    def paser_test(self):
+        try:
+            html = self.get_html_text()
+            soup = BeautifulSoup(html, "html.parser")
+            subNode = soup.body.dl
+            for child in subNode.children:
+                try:
+                    chapterUrl = child.a["href"]
+                    charpterName = child.a.string
+                    return True
+                except:
+                    pass
+        except:
+            return False
+        return False

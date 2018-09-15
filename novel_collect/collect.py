@@ -1,17 +1,21 @@
 import os, sys, re
-from parseConfig import ParseConfig
-from novelLog import logger
-from mysqlV1 import MysqlManager
-import threading, time
 import requests
 from bs4 import BeautifulSoup
 import json
-from parser import Parser
+
+from parseConfig import ParseConfig
+from novelLog import logger
+from public.mysqlV1 import MysqlManager
+from public.myEmail import MyEmail
+import threading, time
+from novelParser import BiQuGeParser
+from untis import send_sms
 
 class Collect:
     def __init__(self, configFile="config.json"):
         self.config = ParseConfig(configFile)
         self.init_database()
+        self.init_email()
         self.init_novel()
 
     def init_database(self):
@@ -20,7 +24,20 @@ class Collect:
             self.mydb = MysqlManager(**self.config.database)
             logger.info("init_database() success.")
         except Exception as e:
-            logger.error("init_database() failed, error:{}".format(str(e)))
+            logger.error("init_database() failed, error:{}\n".format(str(e)))
+            sys.exit(-1)
+
+    def init_email(self):
+        logger.info("init_email() start...")
+        try:
+            smtpServer = self.config.email.get("smtp_server")
+            sender = self.config.email.get("sender")
+            password = self.config.email.get("sender_passwd")
+            charset = self.config.email.get("charset")
+            self.myemail = MyEmail(smtpServer=smtpServer, sender=sender, senderPasswd=password, charset=charset)
+            logger.info("init_email() success.")
+        except Exception as e:
+            logger.error("init_email() failed, error:{}\n".format(str(e)))
             sys.exit(-1)
 
     def init_novel(self):
@@ -88,6 +105,7 @@ class Collect:
         logger.info("reload config....")
         self.config = ParseConfig(confPath)
         self.init_database()
+        self.init_email()
         self.init_novel()
         self.parse_novel()
 
@@ -100,12 +118,13 @@ class Collect:
     def parse_novel_thread(self, novel):
         if not novel.get("status"): return None  # 不启动解析直接返回
         novelName = novel.get("name")
+        charset = novel.get("charset", "gbk")
         url = novel.get("url")
         logger.info("collect [{}] start.".format(novelName))
         time_start = time.time()
 
         try:
-            chapters = Parser(url, encoding="gbk").parse_chapter()
+            chapters = BiQuGeParser(url, encoding=charset).parse_chapter()
             chapterTable = self.get_chapter_table(novelName)
             self.save_chapter(novelName, chapterTable, chapters)
         except Exception as e:
@@ -126,17 +145,57 @@ class Collect:
         result = True
         try:
             url = novel.get("url")
+            charset = novel.get("charset", "gbk")
             sql = "select count(*) as num from tb_novel where url = '{}'".format(url)
             result = self.mydb.execute(sql)
 
             if not result[0].get("num"):
-                result = True if Parser(url, encoding="gbk").parse_chapter() else False
+               result = BiQuGeParser(url, encoding=charset).paser_test()
         except Exception as e:
-            logger.error("->parse_test({}) error:{}".format(novel.get("name"), str(e)))
+            logger.error("parse_test({}) error:{}\n".format(novel.get("name"), str(e)))
             result = False
         return result
 
+    def update_notice(self, novelId, novelName):
+        '''更新通知'''
+        try:
+            sql = "select user_id from tb_user_fav where novel_id = {0} and notice_enable = 1".format(novelId)
+            result = self.mydb.execute(sql)
+            for r in result:
+                userId = r.get("user_id")
+                sql = "select username, email, mobile from tb_user_profile where id = {0}".format(userId)
+                r = self.mydb.execute(sql)
+                username = r[0].get("username")
+                email = r[0].get("email")
+                mobile = r[0].get("mobile")
+
+                content = "[天天悦读]你收藏的小说({0}), 已经更新了.".format(novelName)
+                if email:
+                   self.myemail.set_receiver([email])
+                   subject = "小说更新通知"
+                   stderr = self.myemail.send_email(subject, content)
+                   if stderr:
+                       logger.error("send email to [{0}] failed:{1}".format(username, stderr))
+                   else:
+                       logger.info("send email to [{0}] success.".format(username))
+                elif mobile:
+                    send_sms(mobile, novelName)
+                    logger.info("semd sms to [{0}] success.".format(username))
+                else:
+                    message = "[天天悦读]你收藏的小说({0}), 已经更新了.".format(novelName)
+                    sql = '''
+                    insert into tb_user_message(message, user_id, is_read, add_time)
+                    values('{0}', {1}, 0, now())
+                    '''.format(content, userId)
+                    self.mydb.execute(sql)
+                    logger.info("write message to [{0}] success.".format(username))
+
+        except Exception as e:
+            logger.error("update_notice({0}) error:{1}\n".format(novelName, str(e)))
+
+
     def save_chapter(self, novelName, table, chapters):
+        '''保存章节信息'''
         try:
             sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
             result = self.mydb.execute(sql)
@@ -144,22 +203,27 @@ class Collect:
 
             urls = self.get_all_chapter_url(table, novelId)
 
+            has_update = False
             for chapter in chapters:
                 if chapter[0] in urls: continue
-
+                has_update = True
                 sql = '''
                 insert into {table}(novel_id, chapter_url, chapter_index, chapter_name, add_time)
                 values ({id}, '{url}', {index}, '{name}', now())
                 '''.format(table=table, id=novelId, url=chapter[0], index=self.get_chapter_index(chapter[0]), name=chapter[1])
                 self.mydb.execute(sql)
                 logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
+
+            if has_update:
+                self.update_notice(novelId, novelName)
         except Exception as e:
             raise RuntimeError("save_chapter() error:{}".format(str(e)))
 
     def get_all_chapter_url(self, table, novelId):
         sql = "select chapter_url from {0} where novel_id = {1}".format(table, novelId)
         result = self.mydb.execute(sql)
-        if not result: return []
+        if not result:
+            return []
 
         urls = [dbout.get("chapter_url") for dbout in result if dbout.get("chapter_url")]
         return urls
@@ -172,7 +236,7 @@ class Collect:
     def run(self):
         while True:
             self.parse_novel()
-            time.sleep(30 * 60)
+            time.sleep(10 * 60)
 
 if __name__ == "__main__":
     collect = Collect()

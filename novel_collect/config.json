@@ -3,11 +3,16 @@
     "host": "193.112.150.18",
     "port": 3306,
     "user": "ouru",
-    "passwd": "!@#Test1992...",
+    "passwd": "5201314Ouru...",
     "db": "novel_site",
     "charset": "utf8"
   },
-
+  "email": {
+    "smtp_server": "smtp.163.com",
+    "sender": "gzouru@163.com",
+    "sender_passwd": "qq5201314ouru",
+    "charset": "utf-8"
+  },
   "novel": [
     {
       "name": "全职法师",
@@ -15,41 +20,47 @@
       "url": "https://www.cangqionglongqi.com/quanzhifashi/",
       "status": 1
     },
-	{
-		"name": "学霸的黑科技系统",
-		"site_name": "笔趣阁",
-		"url": "http://www.biqugexsw.com/53_53457/",
-		"status": 1
-	},
-	{
-		"name": "极道天魔",
-		"site_name": "笔趣阁",
-		"url": "https://www.kuxiaoshuo.com/3_3610/",
-		"status": 1
-	},
-	{
-		"name": "牧神记",
-		"site_name": "笔趣阁",
-		"url": "http://www.cdzdgw.com/4_4103/",
-		"status": 1
-	},
     {
-		"name": "琴帝",
-		"site_name": "顶点小说",
-		"url": "https://www.booktxt.net/1_1704/",
-		"status": 1
-	},
+      "name": "学霸的黑科技系统",
+      "site_name": "笔趣阁",
+      "url": "http://www.biqugexsw.com/53_53457/",
+      "status": 1
+    },
     {
-		"name": "斗破苍穹",
-		"site_name": "顶点小说",
-		"url": "https://www.booktxt.net/1_1600/",
-		"status": 1
-	},
-     {
-		"name": "近身保镖",
-		"site_name": "顶点小说",
-		"url": "http://www.booktxt.com/0_778/",
-		"status": 1
-	}
+      "name": "极道天魔",
+      "site_name": "笔趣阁",
+      "url": "https://www.kuxiaoshuo.com/3_3610/",
+      "status": 1
+    },
+    {
+      "name": "牧神记",
+      "site_name": "笔趣阁",
+      "url": "http://www.cdzdgw.com/4_4103/",
+      "status": 1
+    },
+    {
+      "name": "琴帝",
+      "site_name": "顶点小说",
+      "url": "https://www.booktxt.net/1_1704/",
+      "status": 1
+    },
+    {
+      "name": "斗破苍穹",
+      "site_name": "顶点小说",
+      "url": "https://www.booktxt.net/1_1600/",
+      "status": 1
+    },
+    {
+      "name": "近身保镖",
+      "site_name": "顶点小说",
+      "url": "http://www.booktxt.com/0_778/",
+      "status": 1
+    },
+    {
+      "name": "我在末世有套房",
+      "site_name": "笔趣阁",
+      "url": "http://www.biquge.com.tw/15_15025/",
+      "status": 1
+    }
   ]
 }
