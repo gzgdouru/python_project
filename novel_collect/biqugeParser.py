@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
+import os
 
 
 def get_html_text(url, encoding, timeout):

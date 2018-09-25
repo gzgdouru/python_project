@@ -11,6 +11,7 @@ class ParseConfig(object):
         self.email = None
         self.novels = []
         self.database = None
+        self.parsers = {}
         self.parse()
 
     def parse(self):
@@ -30,9 +31,12 @@ class ParseConfig(object):
                 if not os.path.exists(parser) or not os.path.isfile(parser):
                     raise RuntimeError("{0} 不存在或不是文件.".format(parser))
                 extModule = self.load_parser(parser)
-                novel["parser"] = extModule
             else:
-                novel["parser"] = biqugeParser
+                extModule = biqugeParser
+
+            name = self.get_parser_name(parser)
+            if name not in self.parsers:
+                self.parsers[name] = extModule
             self.novels.append(novel)
 
     def load_parser(self, parser):
@@ -47,8 +51,14 @@ class ParseConfig(object):
     def parse_email(self):
         self.email = self.data.get("email")
 
+    @staticmethod
+    def get_parser_name(parser):
+        if parser:
+            name = os.path.splitext(os.path.basename(parser))[0]
+        else:
+            name = biqugeParser.__name__
+        return name
+
 
 if __name__ == "__main__":
-    parseConfig = ParseConfig()
-    print(parseConfig.data)
-    print(parseConfig.novels)
+    print(biqugeParser.__name__)

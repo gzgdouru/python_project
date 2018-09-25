@@ -109,8 +109,7 @@ class Collect:
         self.mydb.execute(sql)
 
     def show_config(self):
-        logger.info("{0}".format(self.config.data))
-        # logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
+        logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
 
     def reset_config(self, confPath="config.json"):
         logger.info("reload config....")
@@ -131,17 +130,17 @@ class Collect:
         novelName = novel.get("name")
         charset = novel.get("charset", "gbk")
         url = novel.get("url")
-        parser = novel.get("parser")
+        parserName = self.config.get_parser_name(novel.get("parser"))
 
-        logger.info("collect [{0}] by [{1}] start...".format(novelName, parser.__name__))
+        logger.info("collect [{0}] by [{1}] start...".format(novelName, parserName))
         time_start = time.time()
 
         try:
-            chapters = parser.parse_chapter(url, encoding=charset)
+            chapters = self.config.parsers[parserName].parse_chapter(url, encoding=charset)
             chapterTable = self.get_chapter_table(novelName)
             self.save_chapter(novelName, chapterTable, chapters)
         except Exception as e:
-            logger.error("{0}:parse_novel_thread() failed, error:{1}".format(parser.__name__, e))
+            logger.error("{0}:parse_novel_thread() failed, error:{1}".format(parserName, e))
         finally:
             time_end = time.time()
             logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end - time_start))
@@ -160,19 +159,19 @@ class Collect:
             url = novel.get("url")
             charset = novel.get("charset", "gbk")
             name = novel.get("name")
-            parser = novel.get("parser")
+            parserName = self.config.get_parser_name(novel.get("parser"))
 
             sql = "select count(*) as num from tb_novel where url = '{}'".format(url)
             result = self.mydb.execute(sql)
 
             if not result[0].get("num"):
-                err = parser.parse_test(url, encoding=charset)
+                err = self.config.parsers[parserName].parse_test(url, encoding=charset)
                 if not err:
                     result = True
                 else:
                     logger.error(err)
         except Exception as e:
-            logger.error("{0}:parse_test({1}) error:{2}".format(parser.__name__, name, e))
+            logger.error("{0}:parse_test({1}) error:{2}".format(parserName, name, e))
         return result
 
     def update_notice(self, novelId, novelName):
