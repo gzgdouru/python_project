@@ -128,17 +128,14 @@ class Collect:
     def parse_novel_thread(self, novel):
         if not novel.get("status"): return None  # 不启动解析直接返回
         novelName = novel.get("name")
-        charset = novel.get("charset", "gbk")
-        url = novel.get("url")
         parserName = self.config.get_parser_name(novel.get("parser"))
 
         logger.info("collect [{0}] by [{1}] start...".format(novelName, parserName))
         time_start = time.time()
 
         try:
-            chapters = self.config.parsers[parserName].parse_chapter(url, encoding=charset)
             chapterTable = self.get_chapter_table(novelName)
-            self.save_chapter(novelName, chapterTable, chapters)
+            self.save_chapter(novel, chapterTable)
         except Exception as e:
             logger.error("{0}:parse_novel_thread() failed, error:{1}".format(parserName, e))
         finally:
@@ -211,8 +208,13 @@ class Collect:
         except Exception as e:
             logger.error("update_notice({0}) error:{1}\n".format(novelName, str(e)))
 
-    def save_chapter(self, novelName, table, chapters):
+    def save_chapter(self, novel, table):
         '''保存章节信息'''
+        url = novel.get("url")
+        novelName = novel.get("name")
+        charset = novel.get("charset")
+        parserName = self.config.get_parser_name(novel.get("parser"))
+
         try:
             sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
             result = self.mydb.execute(sql)
@@ -221,7 +223,7 @@ class Collect:
             urls = self.get_all_chapter_url(table, novelId)
 
             has_update = False
-            for chapter in chapters:
+            for chapter in self.config.parsers[parserName].parse_chapter(url, encoding=charset):
                 if chapter[0] in urls: continue
                 has_update = True
                 sql = '''

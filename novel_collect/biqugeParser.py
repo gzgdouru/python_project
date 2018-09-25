@@ -25,18 +25,11 @@ def parse_chapter(url, encoding="utf-8", timeout=30):
                     pos = chapterUrl.rfind(r"/")
                     chapterUrl = "{0}{1}".format(url, child.a["href"][pos + 1:])
                 charpterName = child.a.string
-
-                # 去掉重复更新的章节
-                if chapterUrl not in urls:
-                    names.append(charpterName)
-                    urls.append(chapterUrl)
+                yield (chapterUrl, charpterName)
             except:
                 pass
-        chapters = zip(urls, names)
     except Exception as e:
         raise RuntimeError("\n paser_chapter({0}) error:{1}".format(url, e))
-        chapters = None
-    return chapters
 
 
 def parse_test(url, encoding="utf-8", timeout=30):
