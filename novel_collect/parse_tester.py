@@ -1,11 +1,10 @@
 import sys
-from novelParser import BiQuGeParser
+from biqugeParser import parse_test
 
 if __name__ == "__main__":
     url = sys.argv[1] if len(sys.argv) > 1 else 'https://www.booktxt.net/1_1600/'
-    parser = BiQuGeParser(url, encoding="gbk")
-    try:
-       chapters = parser.parse_chapter()
-       print(list(chapters))
-    except Exception as e:
-        print("解析出错, error:{}".format(str(e)))
+    err = parse_test(url)
+    if not err:
+        print("解析成功.")
+    else:
+        print("解析失败, error:{0}".format(err))

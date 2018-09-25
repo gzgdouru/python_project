@@ -112,6 +112,7 @@ class UpdateNotice:
                 if not site.get("status"): continue
                 siteName = site.get("name")
                 parseFunc = self.parseMethod.get(siteName, self.default_parse)
+                timeStart = time.time()
                 chapters = parseFunc(site)
                 lastChapterUrl, lastChapterName = chapters.popitem()
                 if not self.chapter_is_exist((lastChapterUrl, lastChapterName), table):
@@ -120,10 +121,8 @@ class UpdateNotice:
                         self.send_chapter_has_content(table, chapters, novelName, siteName, receiver)
                     else:
                         self.send_chapter(table, (lastChapterUrl, lastChapterName), novelName, siteName, receiver)
-                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, lastChapterName))
-                    break
-                else:
-                    logger.info("{0}({1})最新章节: {2}".format(novelName, siteName, lastChapterName))
+                timeEnd = time.time()
+                logger.info("{0}({1})最新章节: {2}, 耗时:{3}".format(novelName, siteName, lastChapterName, timeEnd - timeStart))
             except Exception as e:
                 logger.error("parse_novel_thread({0}) failed, error:[{1}]".format(site.get("url"), str(e)))
 
@@ -154,7 +153,6 @@ class UpdateNotice:
         url = site.get("url")
         chapters = OrderedDict()
         try:
-            timeStart = time.time()
             html = self.get_html_text(url, encode="gbk")
             soup = BeautifulSoup(html, "html.parser")
             subNode = soup.body.dl
@@ -171,8 +169,6 @@ class UpdateNotice:
                         chapters[chapterUrl] = chapterName
                 except:
                     pass
-            timeEnd = time.time()
-            logger.info("parse {0} finish, 耗时:{1}".format(url, timeEnd - timeStart))
         except Exception as e:
             logger.error("parse ({0} failed, error:[{1}])".format(url, str(e)))
             chapters = None

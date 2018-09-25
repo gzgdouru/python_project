@@ -2,21 +2,31 @@ import os, sys, re
 import requests
 from bs4 import BeautifulSoup
 import json
+from datetime import datetime, timedelta
 
 from parseConfig import ParseConfig
 from novelLog import logger
 from public.mysqlV1 import MysqlManager
 from public.myEmail import MyEmail
 import threading, time
-from novelParser import BiQuGeParser
 from untis import send_sms
+
 
 class Collect:
     def __init__(self, configFile="config.json"):
-        self.config = ParseConfig(configFile)
+        self.load_config(configFile)
         self.init_database()
         self.init_email()
         self.init_novel()
+
+    def load_config(self, configFile):
+        logger.info("load_config() start...")
+        try:
+            self.config = ParseConfig(configFile)
+            logger.info("load_config() success.")
+        except Exception as e:
+            logger.error("load_config() failed, error:{0}".format(e))
+            sys.exit(-1)
 
     def init_database(self):
         logger.info("init_database() start...")
@@ -24,7 +34,7 @@ class Collect:
             self.mydb = MysqlManager(**self.config.database)
             logger.info("init_database() success.")
         except Exception as e:
-            logger.error("init_database() failed, error:{}\n".format(str(e)))
+            logger.error("init_database() failed, error:{0}".format(e))
             sys.exit(-1)
 
     def init_email(self):
@@ -37,7 +47,7 @@ class Collect:
             self.myemail = MyEmail(smtpServer=smtpServer, sender=sender, senderPasswd=password, charset=charset)
             logger.info("init_email() success.")
         except Exception as e:
-            logger.error("init_email() failed, error:{}\n".format(str(e)))
+            logger.error("init_email() failed, error:{0}".format(e))
             sys.exit(-1)
 
     def init_novel(self):
@@ -60,7 +70,7 @@ class Collect:
 
             logger.info("init_novel() success.")
         except Exception as e:
-            logger.error("init_novel() failed, error:{}".format(str(e)))
+            logger.error("init_novel() failed, error:{0}".format(e))
             sys.exit(-1)
 
     def check_main_table(self):
@@ -90,7 +100,7 @@ class Collect:
 
         sql = "select count(*) as nums from tb_novel where novel_name = '{0}'".format(novelName)
         result = self.mydb.execute(sql)
-        if result[0].get("nums"): return    #已保存的小说直接返回
+        if result[0].get("nums"): return  # 已保存的小说直接返回
 
         sql = '''
         insert into tb_novel(novel_name, site_name, url, add_time)
@@ -99,11 +109,12 @@ class Collect:
         self.mydb.execute(sql)
 
     def show_config(self):
-        logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
+        logger.info("{0}".format(self.config.data))
+        # logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
 
     def reset_config(self, confPath="config.json"):
         logger.info("reload config....")
-        self.config = ParseConfig(confPath)
+        self.load_config(confPath)
         self.init_database()
         self.init_email()
         self.init_novel()
@@ -120,18 +131,20 @@ class Collect:
         novelName = novel.get("name")
         charset = novel.get("charset", "gbk")
         url = novel.get("url")
-        logger.info("collect [{}] start.".format(novelName))
+        parser = novel.get("parser")
+
+        logger.info("collect [{0}] by [{1}] start...".format(novelName, parser.__name__))
         time_start = time.time()
 
         try:
-            chapters = BiQuGeParser(url, encoding=charset).parse_chapter()
+            chapters = parser.parse_chapter(url, encoding=charset)
             chapterTable = self.get_chapter_table(novelName)
             self.save_chapter(novelName, chapterTable, chapters)
         except Exception as e:
-            logger.error("parse_novel_thread() failed, error:{}".format(str(e)))
+            logger.error("{0}:parse_novel_thread() failed, error:{1}".format(parser.__name__, e))
         finally:
             time_end = time.time()
-            logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end-time_start))
+            logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end - time_start))
 
     def get_chapter_table(self, novelName):
         sql = "select id from tb_novel where novel_name = '{}'".format(novelName)
@@ -142,18 +155,24 @@ class Collect:
         return tableName
 
     def parse_test(self, novel):
-        result = True
+        result = False
         try:
             url = novel.get("url")
             charset = novel.get("charset", "gbk")
+            name = novel.get("name")
+            parser = novel.get("parser")
+
             sql = "select count(*) as num from tb_novel where url = '{}'".format(url)
             result = self.mydb.execute(sql)
 
             if not result[0].get("num"):
-               result = BiQuGeParser(url, encoding=charset).paser_test()
+                err = parser.parse_test(url, encoding=charset)
+                if not err:
+                    result = True
+                else:
+                    logger.error(err)
         except Exception as e:
-            logger.error("parse_test({}) error:{}\n".format(novel.get("name"), str(e)))
-            result = False
+            logger.error("{0}:parse_test({1}) error:{2}".format(parser.__name__, name, e))
         return result
 
     def update_notice(self, novelId, novelName):
@@ -171,13 +190,13 @@ class Collect:
 
                 content = "[天天悦读]你收藏的小说({0}), 已经更新了.".format(novelName)
                 if email:
-                   self.myemail.set_receiver([email])
-                   subject = "小说更新通知"
-                   stderr = self.myemail.send_email(subject, content)
-                   if stderr:
-                       logger.error("send email to [{0}] failed:{1}".format(username, stderr))
-                   else:
-                       logger.info("send email to [{0}] success.".format(username))
+                    self.myemail.set_receiver([email])
+                    subject = "小说更新通知"
+                    stderr = self.myemail.send_email(subject, content)
+                    if stderr:
+                        logger.error("send email to [{0}] failed:{1}".format(username, stderr))
+                    else:
+                        logger.info("send email to [{0}] success.".format(username))
                 elif mobile:
                     send_sms(mobile, novelName)
                     logger.info("semd sms to [{0}] success.".format(username))
@@ -192,7 +211,6 @@ class Collect:
 
         except Exception as e:
             logger.error("update_notice({0}) error:{1}\n".format(novelName, str(e)))
-
 
     def save_chapter(self, novelName, table, chapters):
         '''保存章节信息'''
@@ -210,7 +228,8 @@ class Collect:
                 sql = '''
                 insert into {table}(novel_id, chapter_url, chapter_index, chapter_name, add_time)
                 values ({id}, '{url}', {index}, '{name}', now())
-                '''.format(table=table, id=novelId, url=chapter[0], index=self.get_chapter_index(chapter[0]), name=chapter[1])
+                '''.format(table=table, id=novelId, url=chapter[0], index=self.get_chapter_index(chapter[0]),
+                           name=chapter[1])
                 self.mydb.execute(sql)
                 logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
 
@@ -230,13 +249,14 @@ class Collect:
 
     def get_chapter_index(self, chapterUrl):
         pos = chapterUrl.rfind("/")
-        chapterIndex = re.match(r"\d+", chapterUrl[pos+1:]).group()
+        chapterIndex = re.match(r"\d+", chapterUrl[pos + 1:]).group()
         return int(chapterIndex)
 
     def run(self):
         while True:
             self.parse_novel()
             time.sleep(10 * 60)
+
 
 if __name__ == "__main__":
     collect = Collect()

@@ -18,7 +18,9 @@
       "name": "全职法师",
       "site_name": "顶点小说",
       "url": "https://www.cangqionglongqi.com/quanzhifashi/",
-      "status": 1
+      "status": 1,
+      "charset": "gbk",
+      "parser": "./biqugeParser.py"
     },
     {
       "name": "学霸的黑科技系统",
@@ -60,6 +62,18 @@
       "name": "我在末世有套房",
       "site_name": "笔趣阁",
       "url": "http://www.biquge.com.tw/15_15025/",
+      "status": 1
+    },
+    {
+      "name": "全职高手",
+      "site_name": "笔趣阁",
+      "url": "https://www.woquge.com/0_857/",
+      "status": 1
+    },
+    {
+      "name": "异常生物见闻",
+      "site_name": "笔趣阁",
+      "url": "http://www.biquge.com.tw/4_4029/",
       "status": 1
     }
   ]
