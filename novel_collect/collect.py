@@ -125,6 +125,7 @@ class Collect:
             thread.setDaemon(True)
             thread.start()
 
+
     def parse_novel_thread(self, novel):
         if not novel.get("status"): return None  # 不启动解析直接返回
         novelName = novel.get("name")
@@ -137,7 +138,7 @@ class Collect:
             chapterTable = self.get_chapter_table(novelName)
             self.save_chapter(novel, chapterTable)
         except Exception as e:
-            logger.error("{0}:parse_novel_thread() failed, error:{1}".format(parserName, e))
+            logger.error("{0}:parse_novel_thread({1}) failed, error:{2}".format(parserName, novelName, e))
         finally:
             time_end = time.time()
             logger.info("collect [{}] finish. 耗时:{}".format(novelName, time_end - time_start))
@@ -223,7 +224,8 @@ class Collect:
             urls = self.get_all_chapter_url(table, novelId)
 
             has_update = False
-            for chapter in self.config.parsers[parserName].parse_chapter(url, encoding=charset):
+            parser = self.config.parsers.get(parserName)
+            for chapter in parser.parse_chapter(url, encoding=charset):
                 if chapter[0] in urls: continue
                 has_update = True
                 sql = '''
@@ -237,7 +239,7 @@ class Collect:
             if has_update:
                 self.update_notice(novelId, novelName)
         except Exception as e:
-            raise RuntimeError("save_chapter() error:{}".format(str(e)))
+            raise RuntimeError("\n save_chapter({0}) error:{1}".format(novelName, e))
 
     def get_all_chapter_url(self, table, novelId):
         sql = "select chapter_url from {0} where novel_id = {1}".format(table, novelId)

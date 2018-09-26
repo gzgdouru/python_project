@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
-import os
+import os, re
 
+BASE_URL = "http://www.diyibanzhu.one/"
 
 def get_html_text(url, encoding, timeout):
     respon = requests.get(url, headers={
@@ -14,17 +15,17 @@ def get_html_text(url, encoding, timeout):
 def parse_chapter(url, encoding="utf-8", timeout=30):
     names = []
     urls = []
+
     try:
         html = get_html_text(url, encoding, timeout)
         soup = BeautifulSoup(html, "html.parser")
-        subNode = soup.body.dl
-        for child in subNode.children:
+        aNodes = soup.select(".list_box ul li a")
+        for aNode in aNodes:
             try:
-                chapterUrl = child.a["href"]
+                chapterUrl = aNode["href"]
                 if chapterUrl[:4] != "http":
-                    pos = chapterUrl.rfind(r"/")
-                    chapterUrl = "{0}{1}".format(url, child.a["href"][pos + 1:])
-                charpterName = child.a.string
+                    chapterUrl = "{0}{1}".format(BASE_URL, chapterUrl)
+                charpterName = aNode.string
                 yield (chapterUrl, charpterName)
             except:
                 pass
@@ -36,11 +37,11 @@ def parse_test(url, encoding="utf-8", timeout=30):
     try:
         html = get_html_text(url, encoding, timeout)
         soup = BeautifulSoup(html, "html.parser")
-        subNode = soup.body.dl
-        for child in subNode.children:
+        aNodes = soup.select(".list_box ul li a")
+        for aNode in aNodes:
             try:
-                chapterUrl = child.a["href"]
-                charpterName = child.a.string
+                chapterUrl = aNode["href"]
+                charpterName = aNode.string
                 return None
             except:
                 pass
@@ -52,9 +53,10 @@ def parse_test(url, encoding="utf-8", timeout=30):
 def parse_content(url, encoding="gbk", timeout=30):
     html = get_html_text(url, encoding, timeout)
     soup = BeautifulSoup(html, "html.parser")
-    contentNode = soup.find(id="content")
-    return contentNode.text
+    contentNode = soup.select(".box_box")[0]
+    return str(contentNode).replace("<br/>", "\n")
+
 
 if __name__ == "__main__":
-    url = "https://www.cangqionglongqi.com/quanzhifashi/4281030.html"
+    url = r'http://www.diyibanzhu.one//0/11209/1541929.html'
     print(parse_content(url))
