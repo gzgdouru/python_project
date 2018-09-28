@@ -9,7 +9,7 @@ from novelLog import logger
 from public.mysqlV1 import MysqlManager
 from public.myEmail import MyEmail
 import threading, time
-from untis import send_sms
+from utils import send_sms
 
 
 class Collect:

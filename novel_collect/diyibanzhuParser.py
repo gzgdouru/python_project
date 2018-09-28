@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import os, re
+from urllib import parse
 
 BASE_URL = "http://www.diyibanzhu.one/"
 
@@ -12,7 +13,7 @@ def get_html_text(url, encoding, timeout):
     return respon.text
 
 
-def parse_chapter(url, encoding="utf-8", timeout=30):
+def parse_chapter(url, encoding="gbk", timeout=30):
     names = []
     urls = []
 
@@ -22,9 +23,7 @@ def parse_chapter(url, encoding="utf-8", timeout=30):
         aNodes = soup.select(".list_box ul li a")
         for aNode in aNodes:
             try:
-                chapterUrl = aNode["href"]
-                if chapterUrl[:4] != "http":
-                    chapterUrl = "{0}{1}".format(BASE_URL, chapterUrl)
+                chapterUrl = parse.urljoin(url, aNode["href"])
                 charpterName = aNode.string
                 yield (chapterUrl, charpterName)
             except:
@@ -33,7 +32,7 @@ def parse_chapter(url, encoding="utf-8", timeout=30):
         raise RuntimeError("\n paser_chapter({0}) error:{1}".format(url, e))
 
 
-def parse_test(url, encoding="utf-8", timeout=30):
+def parse_test(url, encoding="gbk", timeout=30):
     try:
         html = get_html_text(url, encoding, timeout)
         soup = BeautifulSoup(html, "html.parser")
@@ -58,5 +57,6 @@ def parse_content(url, encoding="gbk", timeout=30):
 
 
 if __name__ == "__main__":
-    url = r'http://www.diyibanzhu.one//0/11209/1541929.html'
-    print(parse_content(url))
+    url = r'http://www.diyibanzhu.one/0/11209/'
+    for chapter in parse_chapter(url):
+        print(chapter)
