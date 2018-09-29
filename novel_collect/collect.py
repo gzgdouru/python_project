@@ -222,17 +222,25 @@ class Collect:
             novelId = result[0].get("id")
 
             urls = self.get_all_chapter_url(table, novelId)
+            novelId = str(self.get_novel_id(novelName))
+            path = os.path.join(self.config.base.get("file_root"), novelId)
 
             has_update = False
             parser = self.config.parsers.get(parserName)
             for chapter in parser.parse_chapter(url, encoding=charset):
                 if chapter[0] in urls: continue
                 has_update = True
+
+                #生成文件
+                content = parser.parse_content(chapter[0])
+                filePath = self.write_content(path, chapter[0], content=content)
+
+                #保存到数据库
                 sql = '''
-                insert into {table}(novel_id, chapter_url, chapter_index, chapter_name, add_time)
-                values ({id}, '{url}', {index}, '{name}', now())
+                insert into {table}(novel_id, chapter_url, chapter_index, chapter_name, add_time, file_path)
+                values ({id}, '{url}', {index}, '{name}', now(), '{path}')
                 '''.format(table=table, id=novelId, url=chapter[0], index=self.get_chapter_index(chapter[0]),
-                           name=chapter[1])
+                           name=chapter[1], path=filePath)
                 self.mydb.execute(sql)
                 logger.info("save [{}({})] to [{}] success.".format(novelName, chapter[1], table))
 
@@ -254,6 +262,23 @@ class Collect:
         pos = chapterUrl.rfind("/")
         chapterIndex = re.match(r"\d+", chapterUrl[pos + 1:]).group()
         return int(chapterIndex)
+
+    def write_content(self, path, chapterUrl, content):
+        try:
+            if not os.path.exists(path):
+                os.makedirs(path)
+            name = "{0}.txt".format(self.get_chapter_index(chapterUrl))
+            fullPath = os.path.join(path, name)
+            with open(fullPath, "w", encoding="utf-8") as fileObj:
+                fileObj.write(content)
+        except Exception as e:
+            raise RuntimeError("\n write_content({0}) error:{1}".format(fullPath, e))
+        return fullPath
+
+    def get_novel_id(self, novelName):
+        sql = "select id from tb_novel where novel_name = '{0}'".format(novelName)
+        result = self.mydb.execute(sql)
+        return result[0].get("id", novelName)
 
     def run(self):
         while True:

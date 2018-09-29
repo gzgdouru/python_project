@@ -7,6 +7,7 @@ import biqugeParser
 
 class ParseConfig(object):
     def __init__(self, filePath="config.json"):
+        self.base = None
         self.database = None
         self.email = None
         self.novels = []
@@ -15,9 +16,18 @@ class ParseConfig(object):
 
     def parse(self, filePath):
         data = json.loads(open(filePath, encoding="utf-8").read())
+        self.parse_base(data)
         self.parse_database(data)
         self.parse_email(data)
         self.parse_novel(data)
+
+    def parse_base(self, data):
+        self.base = data.get("base")
+
+        fileRoot =  os.path.abspath(self.base.get("file_root"))
+        if not os.path.exists(fileRoot):
+            os.makedirs(fileRoot)
+        self.base["file_root"] = fileRoot
 
     def parse_database(self, data):
         self.database = data.get("database")
@@ -61,6 +71,7 @@ class ParseConfig(object):
 
     def show_config(self):
         data = {
+            "base" : self.base,
             "database" : self.database,
             "email" : self.email,
             "novel" : self.novels,
