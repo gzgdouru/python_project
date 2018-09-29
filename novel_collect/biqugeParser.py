@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
-import os
+import os, re
 from urllib import parse
 
 
@@ -10,6 +10,27 @@ def get_html_text(url, encoding, timeout):
     }, timeout=timeout)
     respon.encoding = encoding
     return respon.text
+
+
+def parse_info(url, encoding="gbk", timeout=30):
+    '''提取小说信息(名称, 作者, 简介)'''
+    try:
+        html = get_html_text(url, encoding, timeout)
+        soup = BeautifulSoup(html, "html.parser")
+        infoNode = soup.select("#info")[0]
+        novelName = infoNode.h1.string
+
+        r = re.match(r"^作.*?者：(\w+)", infoNode.p.string)
+        author = r.group(1) if r else None
+
+        aboutNode = soup.select("#intro")[0]
+        novelAbout = "\n".join(aboutNode.p.strings)
+    except Exception as e:
+        raise RuntimeError("\n parse_info({0}) error:{1}".format(url, e))
+
+    if not novelName or not author:
+        raise RuntimeError("\n parse_info({0}) error:小说名称或者作者为None!".format(url))
+    return novelName, author, novelAbout
 
 
 def parse_chapter(url, encoding="gbk", timeout=30):
@@ -55,5 +76,4 @@ def parse_content(url, encoding="gbk", timeout=30):
 
 if __name__ == "__main__":
     url = "https://www.cangqionglongqi.com/quanzhifashi/"
-    for chapter in parse_chapter(url):
-        print(chapter)
+    print(parse_info(url))

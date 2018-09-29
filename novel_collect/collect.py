@@ -109,7 +109,7 @@ class Collect:
         self.mydb.execute(sql)
 
     def show_config(self):
-        logger.info(json.dumps(self.config.data, indent=2, ensure_ascii=False))
+        logger.info(self.config.show_config())
 
     def reset_config(self, confPath="config.json"):
         logger.info("reload config....")

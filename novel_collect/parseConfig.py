@@ -7,23 +7,23 @@ import biqugeParser
 
 class ParseConfig(object):
     def __init__(self, filePath="config.json"):
-        self.data = json.loads(open(filePath, encoding="utf-8").read())
+        self.database = None
         self.email = None
         self.novels = []
-        self.database = None
         self.parsers = {}
-        self.parse()
+        self.parse(filePath)
 
-    def parse(self):
-        self.parse_database()
-        self.parse_email()
-        self.parse_novel()
+    def parse(self, filePath):
+        data = json.loads(open(filePath, encoding="utf-8").read())
+        self.parse_database(data)
+        self.parse_email(data)
+        self.parse_novel(data)
 
-    def parse_database(self):
-        self.database = self.data.get("database")
+    def parse_database(self, data):
+        self.database = data.get("database")
 
-    def parse_novel(self):
-        novelNodes = self.data.get("novel")
+    def parse_novel(self, data):
+        novelNodes = data.get("novel")
         for novel in novelNodes:
             parser = novel.get("parser")
 
@@ -48,8 +48,8 @@ class ParseConfig(object):
         extModule = __import__('{0}'.format(extModuleName))
         return extModule
 
-    def parse_email(self):
-        self.email = self.data.get("email")
+    def parse_email(self, data):
+        self.email = data.get("email")
 
     @staticmethod
     def get_parser_name(parser):
@@ -59,6 +59,16 @@ class ParseConfig(object):
             name = biqugeParser.__name__
         return name
 
+    def show_config(self):
+        data = {
+            "database" : self.database,
+            "email" : self.email,
+            "novel" : self.novels,
+        }
+
+        return json.dumps(data, indent=3, ensure_ascii=False)
+
 
 if __name__ == "__main__":
-    print(biqugeParser.__name__)
+    config = ParseConfig()
+    print(config.show_config())
