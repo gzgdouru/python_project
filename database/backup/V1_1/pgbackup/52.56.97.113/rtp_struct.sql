@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.2.18
+-- Dumped from database version 9.4.11
 -- Dumped by pg_dump version 9.6.2
 
 SET statement_timeout = 0;
@@ -234,60 +234,6 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM postgres;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO PUBLIC;
-
-
---
--- Name: tb_area_server; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_area_server FROM PUBLIC;
-REVOKE ALL ON TABLE tb_area_server FROM admin;
-GRANT ALL ON TABLE tb_area_server TO admin;
-
-
---
--- Name: tb_ip_area_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ip_area_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ip_area_info FROM admin;
-GRANT ALL ON TABLE tb_ip_area_info TO admin;
-
-
---
--- Name: tb_rtp_stream; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_rtp_stream FROM PUBLIC;
-REVOKE ALL ON TABLE tb_rtp_stream FROM admin;
-GRANT ALL ON TABLE tb_rtp_stream TO admin;
-
-
---
--- Name: tb_rtp_worker; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_rtp_worker FROM PUBLIC;
-REVOKE ALL ON TABLE tb_rtp_worker FROM admin;
-GRANT ALL ON TABLE tb_rtp_worker TO admin;
-
-
---
--- Name: tb_ssrc_gen; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ssrc_gen FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ssrc_gen FROM admin;
-GRANT ALL ON TABLE tb_ssrc_gen TO admin;
-
-
---
--- Name: tb_stream_relationship; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_stream_relationship FROM PUBLIC;
-REVOKE ALL ON TABLE tb_stream_relationship FROM admin;
-GRANT ALL ON TABLE tb_stream_relationship TO admin;
 
 
 --

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.2.18
+-- Dumped from database version 9.4.11
 -- Dumped by pg_dump version 9.6.2
 
 SET statement_timeout = 0;
@@ -760,42 +760,6 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
 --
--- Name: tb_area_server_realtime; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_area_server_realtime FROM PUBLIC;
-REVOKE ALL ON TABLE tb_area_server_realtime FROM admin;
-GRANT ALL ON TABLE tb_area_server_realtime TO admin;
-
-
---
--- Name: tb_area_server_record; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_area_server_record FROM PUBLIC;
-REVOKE ALL ON TABLE tb_area_server_record FROM admin;
-GRANT ALL ON TABLE tb_area_server_record TO admin;
-
-
---
--- Name: tb_ip_area_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ip_area_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ip_area_info FROM admin;
-GRANT ALL ON TABLE tb_ip_area_info TO admin;
-
-
---
--- Name: tb_realtime_worker; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_realtime_worker FROM PUBLIC;
-REVOKE ALL ON TABLE tb_realtime_worker FROM admin;
-GRANT ALL ON TABLE tb_realtime_worker TO admin;
-
-
---
 -- Name: tb_record; Type: ACL; Schema: public; Owner: admin
 --
 
@@ -811,15 +775,6 @@ GRANT ALL ON TABLE tb_record TO admin;
 REVOKE ALL ON TABLE tb_record_history FROM PUBLIC;
 REVOKE ALL ON TABLE tb_record_history FROM admin;
 GRANT ALL ON TABLE tb_record_history TO admin;
-
-
---
--- Name: tb_record_worker; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_record_worker FROM PUBLIC;
-REVOKE ALL ON TABLE tb_record_worker FROM admin;
-GRANT ALL ON TABLE tb_record_worker TO admin;
 
 
 --

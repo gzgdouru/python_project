@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.2.18
+-- Dumped from database version 9.4.11
 -- Dumped by pg_dump version 9.6.2
 
 SET statement_timeout = 0;
@@ -26,20 +26,6 @@ CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 --
 
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
-
---
--- Name: pg_buffercache; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS pg_buffercache WITH SCHEMA public;
-
-
---
--- Name: EXTENSION pg_buffercache; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION pg_buffercache IS 'examine the shared buffer cache';
 
 
 --
@@ -78,6 +64,7 @@ ALTER TYPE dmlac OWNER TO admin;
 CREATE FUNCTION ajb_shop_monitor_audit() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+
 declare
 id uuid;
 action dmlac;
@@ -149,58 +136,11 @@ EXECUTE ins_sql;
 
 RETURN NULL;
 end;
+
 $$;
 
 
 ALTER FUNCTION public.ajb_shop_monitor_audit() OWNER TO admin;
-
---
--- Name: alter_address_own(text, integer, integer, text); Type: FUNCTION; Schema: public; Owner: admin
---
-
-CREATE FUNCTION alter_address_own(old_user_mobile text, usertype integer, user_apptype integer, new_user_mobile text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-uuid_old_user_id uuid;
-uuid_new_user_id uuid;
-uuid_bind_address_user_id uuid;
-
-row_tb_user_addrs_info tb_user_addrs_info%ROWTYPE;
-num_mod_tb_user_addrs_info integer;
-
-BEGIN
-SELECT user_id INTO uuid_old_user_id FROM tb_user_info WHERE user_mobile = old_user_mobile AND user_type = usertype AND user_app_type = user_apptype;
-IF NOT FOUND THEN
-RAISE EXCEPTION 'Not Found the records that user_mobile = %, user_type = %, user_app_type = %', old_user_mobile, usertype, user_apptype;
-RETURN false;
-END IF;
-
-SELECT user_id INTO uuid_new_user_id FROM tb_user_info WHERE user_mobile = new_user_mobile AND user_type = usertype AND user_app_type = user_apptype;
-IF NOT FOUND THEN
-    UPDATE tb_user_info SET user_phone = new_user_mobile, user_mobile = new_user_mobile WHERE user_id = uuid_old_user_id;
-uuid_bind_address_user_id := uuid_old_user_id;
-ELSE
-uuid_bind_address_user_id := uuid_new_user_id;
-RAISE NOTICE  'Records already exist that user_mobile = %, user_type = %, user_app_type = %', new_user_mobile, usertype, user_apptype;
-END IF;
-
-num_mod_tb_user_addrs_info := 0;
-FOR row_tb_user_addrs_info IN SELECT * FROM tb_user_addrs_info WHERE user_addrs_uid = uuid_old_user_id LOOP
-UPDATE tb_user_addrs_info SET user_addrs_uid = uuid_bind_address_user_id WHERE user_addrs_id = row_tb_user_addrs_info.user_addrs_id;
-UPDATE tb_address_info SET addr_mobile = new_user_mobile, addr_phone = new_user_mobile WHERE addr_id = row_tb_user_addrs_info.user_addrs_sid;
-
-num_mod_tb_user_addrs_info := num_mod_tb_user_addrs_info + 1;
-END LOOP;
-
-RAISE NOTICE 'tb_user_addrs_info AND tb_address_info : % lines are changed', num_mod_tb_user_addrs_info;
-
-RETURN true;
-END;
-$$;
-
-
-ALTER FUNCTION public.alter_address_own(old_user_mobile text, usertype integer, user_apptype integer, new_user_mobile text) OWNER TO admin;
 
 --
 -- Name: cfl_test_insert_users(integer); Type: FUNCTION; Schema: public; Owner: admin
@@ -236,23 +176,6 @@ $$;
 
 
 ALTER FUNCTION public.cfl_test_insert_users(num integer) OWNER TO admin;
-
---
--- Name: clean_tb_user_addr(); Type: FUNCTION; Schema: public; Owner: admin
---
-
-CREATE FUNCTION clean_tb_user_addr() RETURNS void
-    LANGUAGE plpgsql
-    AS $$
-begin
-delete from tb_user_info where user_name = 'Operator';
-delete from tb_address_info where addr_id in (SELECT addr_id FROM tb_address_info where addr_mobile is null AND addr_phone is null);
-delete FROM tb_user_addrs_info where user_addrs_uid not in (select user_id from tb_user_info) or user_addrs_sid not in (select addr_id from tb_address_info);
-end;
-$$;
-
-
-ALTER FUNCTION public.clean_tb_user_addr() OWNER TO admin;
 
 --
 -- Name: clean_user_info(text, integer, text); Type: FUNCTION; Schema: public; Owner: admin
@@ -442,31 +365,6 @@ ALTER FUNCTION public.clean_user_info(user_mobile text, app_type integer, app_fa
 
 COMMENT ON FUNCTION clean_user_info(user_mobile text, app_type integer, app_factory text) IS '删除一个用户在数据库中所有相关信息';
 
-
---
--- Name: create_user(text, integer, bigint, integer); Type: FUNCTION; Schema: public; Owner: admin
---
-
-CREATE FUNCTION create_user(code text, num integer, mobile bigint, app_type integer) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
- DECLARE
-	temp_mobile bigint;
-	temp_user_id uuid;
-	temp_code_md5 text;
- BEGIN
-	temp_code_md5=md5(code);
- 	FOR i in 1..num loop
-		temp_mobile=mobile+i-1;
-		temp_user_id=uuid_generate_v4();
-		insert into tb_user_info (user_id,user_name,user_password,user_phone,user_mobile,user_app_type)
-			values (temp_user_id,'homeuser',temp_code_md5,'',temp_mobile::text,app_type);
-	end loop;
- END
- $$;
-
-
-ALTER FUNCTION public.create_user(code text, num integer, mobile bigint, app_type integer) OWNER TO admin;
 
 --
 -- Name: fill_home_addressid(); Type: FUNCTION; Schema: public; Owner: admin
@@ -684,46 +582,18 @@ $$;
 ALTER FUNCTION public.find_error_parent_id2() OWNER TO admin;
 
 --
--- Name: set_addr_mobile(); Type: FUNCTION; Schema: public; Owner: admin
---
-
-CREATE FUNCTION set_addr_mobile() RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$declare
-addr_r RECORD;
-uid_tmp uuid;
-mobile_tmp text;
-begin
-for addr_r in select * from tb_address_info loop
-  select user_addrs_uid into uid_tmp from tb_user_addrs_info where user_addrs_sid = addr_r.addr_id and user_addrs_permission = 0;
-  select user_mobile into mobile_tmp from tb_user_info where user_id = uid_tmp;
-  update tb_address_info set addr_phone = mobile_tmp where addr_id = addr_r.addr_id;
-  update tb_address_info set addr_mobile = mobile_tmp where addr_id = addr_r.addr_id;
-end loop;
-return true;
-end;$$;
-
-
-ALTER FUNCTION public.set_addr_mobile() OWNER TO admin;
-
---
--- Name: FUNCTION set_addr_mobile(); Type: COMMENT; Schema: public; Owner: admin
---
-
-COMMENT ON FUNCTION set_addr_mobile() IS '将 tb_address_info表里的addr_mobile字段填上注册的号码';
-
-
---
 -- Name: tb_alarm_info_delete_trigger(); Type: FUNCTION; Schema: public; Owner: admin
 --
 
 CREATE FUNCTION tb_alarm_info_delete_trigger() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+
 begin
 insert into tb_alarm_info_history values(OLD.*);
 return null;
 end;
+
 $$;
 
 
@@ -740,15 +610,13 @@ curren_record tb_ipc_info%ROWTYPE;
 time_out_record_num integer default 0;
 
 begin
-for curren_record in select * from tb_ipc_info where now() - ipc_last_req_time >= interval '4 MINUTE' and ipc_online = true loop
+for curren_record in select * from tb_ipc_info where now() - ipc_last_req_time >= interval '2 MINUTE' and ipc_online = true loop
 	execute 'notify tb_ipc_info_record_timeout,''' || curren_record.ipc_services_id || ':' || curren_record.ipc_id || '''';
 	time_out_record_num := time_out_record_num + 1;
 end loop;
 
 return time_out_record_num;
 end;
-
-
 $$;
 
 
@@ -848,10 +716,10 @@ CREATE TABLE tb_address_info (
     addr_district text,
     addr_safe_status boolean DEFAULT false NOT NULL,
     addr_register_time timestamp without time zone,
-    addr_type integer DEFAULT 1 NOT NULL,
     addr_on_defence_time text,
     addr_off_defence_time text,
     addr_timer_switch boolean DEFAULT false NOT NULL,
+    addr_type integer DEFAULT 1 NOT NULL,
     addr_public_type integer DEFAULT 0 NOT NULL,
     addr_phone_name_1 text,
     addr_phone_2 text,
@@ -932,13 +800,6 @@ COMMENT ON COLUMN tb_address_info.addr_safe_status IS '安防状态（false：�
 
 
 --
--- Name: COLUMN tb_address_info.addr_type; Type: COMMENT; Schema: public; Owner: admin
---
-
-COMMENT ON COLUMN tb_address_info.addr_type IS '商铺类型（缺省值为：1 运营商铺， 2：测试商铺, 3: 付费商铺,4:欠费商铺-租借方式）';
-
-
---
 -- Name: COLUMN tb_address_info.addr_on_defence_time; Type: COMMENT; Schema: public; Owner: admin
 --
 
@@ -957,6 +818,13 @@ COMMENT ON COLUMN tb_address_info.addr_off_defence_time IS '关闭布防时间�
 --
 
 COMMENT ON COLUMN tb_address_info.addr_timer_switch IS '定时布防开关(false: 默认值关闭，true: 打开)';
+
+
+--
+-- Name: COLUMN tb_address_info.addr_type; Type: COMMENT; Schema: public; Owner: admin
+--
+
+COMMENT ON COLUMN tb_address_info.addr_type IS '商铺类型（缺省值为：1 运营商铺， 2：测试商铺, 3: 付费商铺,4:欠费商铺-租借方式）';
 
 
 --
@@ -1319,7 +1187,8 @@ CREATE TABLE tb_alarm_info_history (
     alarm_time_push_to_third_party timestamp without time zone,
     alarm_sensor_name text,
     alarm_fingerprint_name text,
-    alarm_child_dev_number integer DEFAULT 99999
+    alarm_child_dev_number integer DEFAULT 99999,
+    alarm_fingerprint_id text
 );
 
 
@@ -1443,6 +1312,13 @@ COMMENT ON COLUMN tb_alarm_info_history.alarm_fingerprint_name IS '指纹名字'
 
 COMMENT ON COLUMN tb_alarm_info_history.alarm_child_dev_number IS '子设备序号
 99999：无效的序号';
+
+
+--
+-- Name: COLUMN tb_alarm_info_history.alarm_fingerprint_id; Type: COMMENT; Schema: public; Owner: admin
+--
+
+COMMENT ON COLUMN tb_alarm_info_history.alarm_fingerprint_id IS '钥匙id';
 
 
 --
@@ -2479,7 +2355,7 @@ COMMENT ON COLUMN tb_ipc_ptz_info.ptz_preset_name IS '预置点名称';
 -- Name: COLUMN tb_ipc_ptz_info.ptz_preset_number; Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON COLUMN tb_ipc_ptz_info.ptz_preset_number IS '预置点标记';
+COMMENT ON COLUMN tb_ipc_ptz_info.ptz_preset_number IS '预置点标记，服务生成';
 
 
 --
@@ -3429,67 +3305,6 @@ CREATE TABLE tb_oauth_authentication (
 
 
 ALTER TABLE tb_oauth_authentication OWNER TO admin;
-
---
--- Name: tb_oauth_users; Type: TABLE; Schema: public; Owner: admin
---
-
-CREATE TABLE tb_oauth_users (
-    user_id integer NOT NULL,
-    user_guid character varying NOT NULL,
-    create_time timestamp without time zone,
-    user_archived boolean,
-    user_version integer NOT NULL,
-    user_password character varying NOT NULL,
-    user_name character varying NOT NULL,
-    user_default_user boolean,
-    last_login_time timestamp without time zone
-);
-
-
-ALTER TABLE tb_oauth_users OWNER TO admin;
-
---
--- Name: tb_oauth_users_id_seq; Type: SEQUENCE; Schema: public; Owner: admin
---
-
-CREATE SEQUENCE tb_oauth_users_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE tb_oauth_users_id_seq OWNER TO admin;
-
---
--- Name: tb_oauth_users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
---
-
-ALTER SEQUENCE tb_oauth_users_id_seq OWNED BY tb_oauth_users.user_id;
-
-
---
--- Name: tb_oauth_users_version_seq; Type: SEQUENCE; Schema: public; Owner: admin
---
-
-CREATE SEQUENCE tb_oauth_users_version_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE tb_oauth_users_version_seq OWNER TO admin;
-
---
--- Name: tb_oauth_users_version_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
---
-
-ALTER SEQUENCE tb_oauth_users_version_seq OWNED BY tb_oauth_users.user_version;
-
 
 --
 -- Name: tb_op_address_alloc_info; Type: TABLE; Schema: public; Owner: admin
@@ -4626,13 +4441,6 @@ COMMENT ON COLUMN tb_record_info_history.record_file_size IS '录像文件大小
 
 
 --
--- Name: COLUMN tb_record_info_history.record_http_url; Type: COMMENT; Schema: public; Owner: admin
---
-
-COMMENT ON COLUMN tb_record_info_history.record_http_url IS '录像http下载url';
-
-
---
 -- Name: COLUMN tb_record_info_history.record_start_ipc_time; Type: COMMENT; Schema: public; Owner: admin
 --
 
@@ -5079,8 +4887,8 @@ CREATE TABLE tb_scence_info (
     scence_value integer DEFAULT 0 NOT NULL,
     scence_info text,
     scence_uid uuid,
-    scence_linkage_description text,
     scence_linkage_info bytea,
+    scence_linkage_description text,
     scence_register_time timestamp without time zone DEFAULT now() NOT NULL,
     scence_addressid uuid,
     CONSTRAINT tb_scence_info_scence_id_check CHECK ((scence_id <> '00000000-0000-0000-0000-000000000000'::uuid))
@@ -5139,17 +4947,17 @@ COMMENT ON COLUMN tb_scence_info.scence_uid IS '用户id';
 
 
 --
--- Name: COLUMN tb_scence_info.scence_linkage_description; Type: COMMENT; Schema: public; Owner: admin
---
-
-COMMENT ON COLUMN tb_scence_info.scence_linkage_description IS '告警联动描述';
-
-
---
 -- Name: COLUMN tb_scence_info.scence_linkage_info; Type: COMMENT; Schema: public; Owner: admin
 --
 
 COMMENT ON COLUMN tb_scence_info.scence_linkage_info IS '告警联动信息';
+
+
+--
+-- Name: COLUMN tb_scence_info.scence_linkage_description; Type: COMMENT; Schema: public; Owner: admin
+--
+
+COMMENT ON COLUMN tb_scence_info.scence_linkage_description IS '告警联动描述';
 
 
 --
@@ -5921,9 +5729,7 @@ CREATE TABLE tb_timer_work_info (
     timer_time_zone_offset integer DEFAULT 28800,
     timer_start_time_utc text,
     CONSTRAINT tb_timer_work_info_timer_work_id_check CHECK ((timer_work_id <> '00000000-0000-0000-0000-000000000000'::uuid)),
-    CONSTRAINT tb_timer_work_info_timer_work_periodic_check CHECK (((timer_work_periodic >= 1) AND (timer_work_periodic <= 2))),
-    CONSTRAINT tb_timer_work_info_timer_work_status_check CHECK (((timer_work_status >= 0) AND (timer_work_status <= 1))),
-    CONSTRAINT tb_timer_work_info_timer_work_type_check CHECK (((timer_work_type >= 1) AND (timer_work_type <= 4)))
+    CONSTRAINT tb_timer_work_info_timer_work_status_check CHECK (((timer_work_status >= 0) AND (timer_work_status <= 1)))
 );
 
 
@@ -6320,7 +6126,7 @@ COMMENT ON COLUMN tb_user_event_info_history.user_event_msg IS '事件文本消�
 
 CREATE TABLE tb_user_info (
     user_id uuid NOT NULL,
-    user_name text NOT NULL,
+    user_name text DEFAULT ''::text NOT NULL,
     user_password text NOT NULL,
     user_email text,
     user_phone text NOT NULL,
@@ -6333,7 +6139,7 @@ CREATE TABLE tb_user_info (
     user_broker_port integer,
     user_is_push boolean DEFAULT true NOT NULL,
     user_clientid uuid,
-    user_type integer DEFAULT 1 NOT NULL,
+    user_type integer,
     user_ostype integer DEFAULT 1,
     user_device_id text,
     user_app_type integer DEFAULT 0 NOT NULL,
@@ -6347,7 +6153,7 @@ CREATE TABLE tb_user_info (
     user_address text,
     user_area_type integer DEFAULT 1 NOT NULL,
     user_cloudfilesize_used bigint DEFAULT 0 NOT NULL,
-    user_cloudfilesize_max bigint DEFAULT 53687091200::bigint NOT NULL,
+    user_cloudfilesize_max bigint DEFAULT 10737418240::bigint NOT NULL,
     user_langtype integer,
     user_time_zone text,
     user_time_zone_offset integer,
@@ -6792,36 +6598,11 @@ COMMENT ON COLUMN tb_voice_info_new.voice_dst_type IS '类型， 0为ipc, 1为ap
 
 
 --
--- Name: users; Type: TABLE; Schema: public; Owner: admin
+-- Name: tb_linkage_action_info action_id; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
-CREATE TABLE users (
-    "id`" integer NOT NULL,
-    guid "char",
-    create_time date,
-    archived integer,
-    version integer,
-    password "char",
-    username "char",
-    default_user "char",
-    last_login_time date
-);
-
-
-ALTER TABLE users OWNER TO admin;
-
---
--- Name: tb_oauth_users user_id; Type: DEFAULT; Schema: public; Owner: admin
---
-
-ALTER TABLE ONLY tb_oauth_users ALTER COLUMN user_id SET DEFAULT nextval('tb_oauth_users_id_seq'::regclass);
-
-
---
--- Name: tb_oauth_users user_version; Type: DEFAULT; Schema: public; Owner: admin
---
-
-ALTER TABLE ONLY tb_oauth_users ALTER COLUMN user_version SET DEFAULT nextval('tb_oauth_users_version_seq'::regclass);
+ALTER TABLE ONLY tb_linkage_action_info
+    ADD CONSTRAINT action_id PRIMARY KEY (action_id);
 
 
 --
@@ -7093,7 +6874,7 @@ ALTER TABLE ONLY tb_ipc_versions_info
 --
 
 ALTER TABLE ONLY tb_key_homeappliance_info
-    ADD CONSTRAINT tb_key_homeappliance_info_key_number_home_appliance_id_key UNIQUE (home_appliance_id, key_number);
+    ADD CONSTRAINT tb_key_homeappliance_info_key_number_home_appliance_id_key UNIQUE (key_number, home_appliance_id);
 
 
 --
@@ -7145,14 +6926,6 @@ ALTER TABLE ONLY tb_oauth_authentication
 
 
 --
--- Name: tb_oauth_users tb_oauth_users_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
---
-
-ALTER TABLE ONLY tb_oauth_users
-    ADD CONSTRAINT tb_oauth_users_pkey PRIMARY KEY (user_id);
-
-
---
 -- Name: tb_op_address_alloc_info tb_op_address_alloc_info_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -7166,14 +6939,6 @@ ALTER TABLE ONLY tb_op_address_alloc_info
 
 ALTER TABLE ONLY tb_op_alarm_alloc_info
     ADD CONSTRAINT tb_op_alarm_alloc_info_pkey PRIMARY KEY (alloc_id);
-
-
---
--- Name: tb_op_point_info tb_op_point_info_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
---
-
-ALTER TABLE ONLY tb_op_point_info
-    ADD CONSTRAINT tb_op_point_info_pkey PRIMARY KEY (op_point_id);
 
 
 --
@@ -7441,28 +7206,6 @@ ALTER TABLE ONLY tb_oauth_authentication
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
---
-
-ALTER TABLE ONLY users
-    ADD CONSTRAINT users_pkey PRIMARY KEY ("id`");
-
-
---
--- Name: tb_alarm_info_alarm_event_type_idx; Type: INDEX; Schema: public; Owner: admin
---
-
-CREATE INDEX tb_alarm_info_alarm_event_type_idx ON tb_alarm_info USING btree (alarm_event_type);
-
-
---
--- Name: tb_alarm_info_alarm_ipc_id_idx; Type: INDEX; Schema: public; Owner: admin
---
-
-CREATE INDEX tb_alarm_info_alarm_ipc_id_idx ON tb_alarm_info USING btree (alarm_ipc_id);
-
-
---
 -- Name: tb_push_info_push_report_status_idx; Type: INDEX; Schema: public; Owner: admin
 --
 
@@ -7491,69 +7234,6 @@ CREATE INDEX tb_push_info_push_user_id_idx ON tb_push_info USING btree (push_use
 
 
 --
--- Name: tb_address_info tb_address_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_address_info_audit AFTER DELETE ON tb_address_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_device_scence_info tb_device_scence_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_device_scence_info_audit AFTER DELETE ON tb_device_scence_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_home_info tb_home_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_home_info_audit AFTER DELETE ON tb_home_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_ipc_info tb_ipc_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_ipc_info_audit AFTER DELETE ON tb_ipc_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_scence_info tb_scence_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_scence_info_audit AFTER DELETE ON tb_scence_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_sensor_ipc_info tb_sensor_ipc_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_sensor_ipc_info_audit AFTER DELETE ON tb_sensor_ipc_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_sensors_info tb_sensors_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_sensors_info_audit AFTER DELETE ON tb_sensors_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_user_addrs_info tb_user_addrs_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_user_addrs_info_audit AFTER DELETE ON tb_user_addrs_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
--- Name: tb_user_info tb_user_info_audit; Type: TRIGGER; Schema: public; Owner: admin
---
-
-CREATE TRIGGER tb_user_info_audit AFTER DELETE ON tb_user_info FOR EACH ROW EXECUTE PROCEDURE ajb_shop_monitor_audit();
-
-
---
 -- Name: public; Type: ACL; Schema: -; Owner: postgres
 --
 
@@ -7579,15 +7259,6 @@ GRANT ALL ON TABLE tb_ac_control_pfile TO admin;
 REVOKE ALL ON TABLE tb_address_info FROM PUBLIC;
 REVOKE ALL ON TABLE tb_address_info FROM admin;
 GRANT ALL ON TABLE tb_address_info TO admin;
-
-
---
--- Name: tb_address_lease_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_address_lease_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_address_lease_info FROM admin;
-GRANT ALL ON TABLE tb_address_lease_info TO admin;
 
 
 --
@@ -7627,15 +7298,6 @@ GRANT ALL ON TABLE tb_audit_info TO admin;
 
 
 --
--- Name: tb_client_url_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_client_url_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_client_url_info FROM admin;
-GRANT ALL ON TABLE tb_client_url_info TO admin;
-
-
---
 -- Name: tb_device_scence_info; Type: ACL; Schema: public; Owner: admin
 --
 
@@ -7672,15 +7334,6 @@ GRANT ALL ON TABLE tb_ip_address_info TO admin;
 
 
 --
--- Name: tb_ipc_detector_rect; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ipc_detector_rect FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ipc_detector_rect FROM admin;
-GRANT ALL ON TABLE tb_ipc_detector_rect TO admin;
-
-
---
 -- Name: tb_ipc_info; Type: ACL; Schema: public; Owner: admin
 --
 
@@ -7690,39 +7343,12 @@ GRANT ALL ON TABLE tb_ipc_info TO admin;
 
 
 --
--- Name: tb_ipc_restore_settings; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ipc_restore_settings FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ipc_restore_settings FROM admin;
-GRANT ALL ON TABLE tb_ipc_restore_settings TO admin;
-
-
---
--- Name: tb_ipc_sensordata; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ipc_sensordata FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ipc_sensordata FROM admin;
-GRANT ALL ON TABLE tb_ipc_sensordata TO admin;
-
-
---
 -- Name: tb_ipc_sensordata_history; Type: ACL; Schema: public; Owner: admin
 --
 
 REVOKE ALL ON TABLE tb_ipc_sensordata_history FROM PUBLIC;
 REVOKE ALL ON TABLE tb_ipc_sensordata_history FROM admin;
 GRANT ALL ON TABLE tb_ipc_sensordata_history TO admin;
-
-
---
--- Name: tb_ipc_session_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ipc_session_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ipc_session_info FROM admin;
-GRANT ALL ON TABLE tb_ipc_session_info TO admin;
 
 
 --
@@ -7744,15 +7370,6 @@ GRANT ALL ON TABLE tb_key_homeappliance_info TO admin;
 
 
 --
--- Name: tb_op_address_alloc_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_op_address_alloc_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_op_address_alloc_info FROM admin;
-GRANT ALL ON TABLE tb_op_address_alloc_info TO admin;
-
-
---
 -- Name: tb_op_alarm_alloc_info; Type: ACL; Schema: public; Owner: admin
 --
 
@@ -7768,24 +7385,6 @@ GRANT ALL ON TABLE tb_op_alarm_alloc_info TO admin;
 REVOKE ALL ON TABLE tb_op_alarm_info FROM PUBLIC;
 REVOKE ALL ON TABLE tb_op_alarm_info FROM admin;
 GRANT ALL ON TABLE tb_op_alarm_info TO admin;
-
-
---
--- Name: tb_op_point_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_op_point_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_op_point_info FROM admin;
-GRANT ALL ON TABLE tb_op_point_info TO admin;
-
-
---
--- Name: tb_op_user_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_op_user_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_op_user_info FROM admin;
-GRANT ALL ON TABLE tb_op_user_info TO admin;
 
 
 --
@@ -7840,33 +7439,6 @@ GRANT ALL ON TABLE tb_record_info TO admin;
 REVOKE ALL ON TABLE tb_record_info_history FROM PUBLIC;
 REVOKE ALL ON TABLE tb_record_info_history FROM admin;
 GRANT ALL ON TABLE tb_record_info_history TO admin;
-
-
---
--- Name: tb_record_status_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_record_status_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_record_status_info FROM admin;
-GRANT ALL ON TABLE tb_record_status_info TO admin;
-
-
---
--- Name: tb_rtp_interactive; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_rtp_interactive FROM PUBLIC;
-REVOKE ALL ON TABLE tb_rtp_interactive FROM admin;
-GRANT ALL ON TABLE tb_rtp_interactive TO admin;
-
-
---
--- Name: tb_rtp_stream; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_rtp_stream FROM PUBLIC;
-REVOKE ALL ON TABLE tb_rtp_stream FROM admin;
-GRANT ALL ON TABLE tb_rtp_stream TO admin;
 
 
 --
@@ -7951,30 +7523,12 @@ GRANT ALL ON TABLE tb_timer_work_info TO admin;
 
 
 --
--- Name: tb_transaction_msg_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_transaction_msg_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_transaction_msg_info FROM admin;
-GRANT ALL ON TABLE tb_transaction_msg_info TO admin;
-
-
---
 -- Name: tb_user_addrs_info; Type: ACL; Schema: public; Owner: admin
 --
 
 REVOKE ALL ON TABLE tb_user_addrs_info FROM PUBLIC;
 REVOKE ALL ON TABLE tb_user_addrs_info FROM admin;
 GRANT ALL ON TABLE tb_user_addrs_info TO admin;
-
-
---
--- Name: tb_user_casual_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_user_casual_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_user_casual_info FROM admin;
-GRANT ALL ON TABLE tb_user_casual_info TO admin;
 
 
 --

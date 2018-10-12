@@ -1152,7 +1152,8 @@ CREATE TABLE tb_alarm_info_history (
     alarm_time_push_to_third_party timestamp without time zone,
     alarm_sensor_name text,
     alarm_fingerprint_name text,
-    alarm_child_dev_number integer DEFAULT 99999
+    alarm_child_dev_number integer DEFAULT 99999,
+    alarm_fingerprint_id text
 );
 
 
@@ -1276,6 +1277,13 @@ COMMENT ON COLUMN tb_alarm_info_history.alarm_fingerprint_name IS '指纹名字'
 
 COMMENT ON COLUMN tb_alarm_info_history.alarm_child_dev_number IS '子设备序号
 99999：无效的序号';
+
+
+--
+-- Name: COLUMN tb_alarm_info_history.alarm_fingerprint_id; Type: COMMENT; Schema: public; Owner: admin
+--
+
+COMMENT ON COLUMN tb_alarm_info_history.alarm_fingerprint_id IS '钥匙id';
 
 
 --
@@ -5935,7 +5943,6 @@ CREATE TABLE tb_user_info (
     CONSTRAINT tb_user_info_user_app_type_check CHECK (((user_app_type >= 0) AND (user_app_type <= 4))),
     CONSTRAINT tb_user_info_user_area_type_check CHECK (((user_area_type >= 1) AND (user_area_type <= 5))),
     CONSTRAINT tb_user_info_user_id_check CHECK ((user_id <> '00000000-0000-0000-0000-000000000000'::uuid)),
-    CONSTRAINT tb_user_info_user_ostype_check CHECK (((user_ostype >= 1) AND (user_ostype <= 2))),
     CONSTRAINT tb_user_info_user_type_check CHECK (((user_type >= 0) AND (user_type <= 4)))
 );
 
@@ -6045,7 +6052,8 @@ COMMENT ON COLUMN tb_user_info.user_type IS '用户类型 1 普通app用户 2 �
 --
 
 COMMENT ON COLUMN tb_user_info.user_ostype IS 'Android=1;
-Ios=2;';
+Ios=2;
+ios_hd=3;';
 
 
 --
@@ -6062,7 +6070,8 @@ COMMENT ON COLUMN tb_user_info.user_device_id IS 'ios手机设备ID';
 COMMENT ON COLUMN tb_user_info.user_app_type IS '用户所使用的APP类型：
 1：安店宝
 2：安居小宝
-4：易视';
+4：易视
+';
 
 
 --

@@ -1,13 +1,15 @@
 {
   "base": {
-    "file_root" : "./novels"
+    "file_root": "../novels",
+    "novels" : 2,
+    "chapters" : 3
   },
   "database": {
     "host": "193.112.150.18",
     "port": 3306,
     "user": "ouru",
     "passwd": "5201314Ouru...",
-    "db": "novel_site",
+    "db": "ourutest",
     "charset": "utf8"
   },
   "email": {
@@ -19,79 +21,50 @@
   "novel": [
     {
       "name": "全职法师",
-      "site_name": "顶点小说",
       "url": "https://www.cangqionglongqi.com/quanzhifashi/",
       "status": 1,
       "charset": "gbk",
       "parser": "./biqugeParser.py"
     },
     {
-      "name": "学霸的黑科技系统",
-      "site_name": "笔趣阁",
-      "url": "http://www.biqugexsw.com/53_53457/",
-      "status": 1
-    },
-    {
       "name": "极道天魔",
-      "site_name": "笔趣阁",
       "url": "https://www.kuxiaoshuo.com/3_3610/",
       "status": 1
     },
     {
       "name": "牧神记",
-      "site_name": "笔趣阁",
       "url": "http://www.cdzdgw.com/4_4103/",
       "status": 1
     },
     {
       "name": "琴帝",
-      "site_name": "顶点小说",
       "url": "https://www.booktxt.net/1_1704/",
       "status": 1
     },
     {
       "name": "斗破苍穹",
-      "site_name": "顶点小说",
       "url": "https://www.booktxt.net/1_1600/",
       "status": 1
     },
     {
       "name": "近身保镖",
-      "site_name": "顶点小说",
       "url": "http://www.booktxt.com/0_778/",
       "status": 1
     },
     {
       "name": "我在末世有套房",
-      "site_name": "笔趣阁",
       "url": "http://www.biquge.com.tw/15_15025/",
       "status": 1
     },
     {
       "name": "全职高手",
-      "site_name": "笔趣阁",
       "url": "https://www.woquge.com/0_857/",
       "status": 1
     },
     {
       "name": "异常生物见闻",
-      "site_name": "笔趣阁",
       "url": "http://www.biquge.com.tw/4_4029/",
       "status": 1
-    },
-    {
-      "name": "妖刀记（1-44卷）",
-      "site_name": "第一版主小说网",
-      "url": "http://www.diyibanzhu.one/6/6587/",
-      "status": 1,
-      "parser": "./diyibanzhuParser.py"
-    },
-    {
-      "name": "妖刀记（49卷）",
-      "site_name": "第一版主小说网",
-      "url": "http://www.diyibanzhu.one/11/11209/",
-      "status": 1,
-      "parser": "./diyibanzhuParser.py"
     }
   ]
 }

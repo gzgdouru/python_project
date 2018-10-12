@@ -1,79 +1,79 @@
-from bs4 import BeautifulSoup
 import requests
 import os, re
 from urllib import parse
+from lxml import etree
+
+from dataStructures import NovelInfo, ChapterInfo, EXCEPTION_PREFIX
 
 
 def get_html_text(url, encoding, timeout):
-    respon = requests.get(url, headers={
+    response = requests.get(url, headers={
         'user-agent': 'Mozilla/5.0'
     }, timeout=timeout)
-    respon.encoding = encoding
-    return respon.text
+    response.encoding = encoding
+
+    if not response.text:
+        raise RuntimeError("{0}获取[{1}]内容失败!".format(EXCEPTION_PREFIX, url))
+
+    return response.text
 
 
 def parse_info(url, encoding="gbk", timeout=30):
-    '''提取小说信息(名称, 作者, 简介)'''
+    '''提取小说信息(网站名称, 小说名称, 作者, 简介, 详细介绍)'''
     try:
         html = get_html_text(url, encoding, timeout)
-        soup = BeautifulSoup(html, "html.parser")
-        infoNode = soup.select("#info")[0]
-        novelName = infoNode.h1.string
+        htmltree = etree.HTML(html)
 
-        r = re.match(r"^作.*?者：(\w+)", infoNode.p.string)
+
+        site = htmltree.xpath("//div[@class='header']/div[@class='header_logo']/a/text()")[0]
+        author = htmltree.xpath("//div[@id='info']/p[1]/text()")[0]
+
+        r = re.match(r"^作.*?者：(\w+)", author)
         author = r.group(1) if r else None
 
-        aboutNode = soup.select("#intro")[0]
-        novelAbout = "\n".join(aboutNode.p.strings)
+        intro = htmltree.xpath("//div[@id='intro']/p[1]/text()")
+        intro = "\n".join(intro)
+        detail = intro
+        intro = (intro[:252] + "...") if len(intro) > 255 else intro
     except Exception as e:
-        raise RuntimeError("\n parse_info({0}) error:{1}".format(url, e))
+        raise RuntimeError("{0}biqugeParser::parse_info({1})失败, 原因:{2}".format(EXCEPTION_PREFIX, url, e))
 
-    if not novelName or not author:
-        raise RuntimeError("\n parse_info({0}) error:小说名称或者作者为None!".format(url))
-    return novelName, author, novelAbout
+    if not author:
+        raise RuntimeError("{0}biqugeParser::parse_info({1})失败, 原因:小说作者为None!".format(EXCEPTION_PREFIX, url))
+
+    return NovelInfo(site=site, author=author, intro=intro, detail=detail)
 
 
 def parse_chapter(url, encoding="gbk", timeout=30):
-    names = []
-    urls = []
     try:
-        html = get_html_text(url, encoding, timeout)
-        soup = BeautifulSoup(html, "html.parser")
-        subNode = soup.body.dl
-        for child in subNode.children:
-            try:
-                chapterUrl = parse.urljoin(url, child.a["href"])
-                charpterName = child.a.string
-                yield (chapterUrl, charpterName)
-            except:
-                pass
+        htmltree = etree.HTML(get_html_text(url, encoding, timeout))
+        chapters = htmltree.xpath("//div[@id='list']/dl/dd/a")
+        for chapter in chapters:
+            chapterUrl = parse.urljoin(url, chapter.get("href"))
+            charpterName = chapter.text
+            yield ChapterInfo(url=chapterUrl, name=charpterName)
     except Exception as e:
-        raise RuntimeError("\n paser_chapter({0}) error:{1}".format(url, e))
+        raise RuntimeError("{0}biqugeParser::paser_chapter({1})失败, 原因:{2}".format(EXCEPTION_PREFIX, url, e))
 
 
 def parse_test(url, encoding="gbk", timeout=30):
     try:
-        html = get_html_text(url, encoding, timeout)
-        soup = BeautifulSoup(html, "html.parser")
-        subNode = soup.body.dl
-        for child in subNode.children:
-            try:
-                chapterUrl = child.a["href"]
-                charpterName = child.a.string
-                return None
-            except:
-                pass
+        chapters = parse_chapter(url, encoding=encoding, timeout=timeout)
+        for chapter in chapters:
+            return True
     except Exception as e:
-        return "parse url: {0} failed, error:{1}".format(url, e)
-    return "找不到章节信息!"
-
+        raise RuntimeError("{0}biqugeParser:parse_test({1})失败, 原因: {2}".format(EXCEPTION_PREFIX, url, e))
+    raise RuntimeError("{0}biqugeParser:parse_test({1})失败, 原因: 提取章节信息失败!".format(EXCEPTION_PREFIX, url))
 
 def parse_content(url, encoding="gbk", timeout=30):
-    html = get_html_text(url, encoding, timeout)
-    soup = BeautifulSoup(html, "html.parser")
-    contentNode = soup.find(id="content")
-    return contentNode.text
+    try:
+        htmltree = etree.HTML(get_html_text(url, encoding, timeout))
+        contentNode = htmltree.xpath("//div[@id='content']")[0]
+    except Exception as e:
+        raise RuntimeError("{0}biqugeParser:parse_content({1})失败, 原因: {2}".format(EXCEPTION_PREFIX, url, e))
+    return etree.tostring(contentNode, encoding="utf-8").decode("utf-8")
+
 
 if __name__ == "__main__":
-    url = "https://www.cangqionglongqi.com/quanzhifashi/"
-    print(parse_info(url))
+    url = "https://www.woquge.com/0_857/653455.html"
+    print(parse_content(url))

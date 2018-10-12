@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.2.18
+-- Dumped from database version 9.4.11
 -- Dumped by pg_dump version 9.6.2
 
 SET statement_timeout = 0;
@@ -532,7 +532,7 @@ for current_db_tb_id_record in select * from tb_network_sync_info where table_na
 			--keepalives_idle=1 tcp心跳间隔的空闲时间 1秒
 			--keepalives_interval=1 对方没有回应时发送 tcp心跳的间隔时间 1秒
 			--keepalives_count=3 在认为客户端到服务器的连接死亡之前，可以丢失的TCP保持激活的数量 3个
-			execute 'select dblink_connect(''' || current_dblink || ''','''|| 'host=' || host(current_db_tb_id_record.host) ||  ' port=' || current_db_tb_id_record.port || ' dbname=' || current_db_tb_id_record.db_name || ' user=' || current_db_tb_id_record.db_user || ' password=' || current_db_tb_id_record.db_password || ' connect_timeout=8  keepalives=1 keepalives_idle=1 keepalives_interval=2 keepalives_count=4'');';
+			execute 'select dblink_connect(''' || current_dblink || ''','''|| 'host=' || host(current_db_tb_id_record.host) ||  ' port=' || current_db_tb_id_record.port || ' dbname=' || current_db_tb_id_record.db_name || ' user=' || current_db_tb_id_record.db_user || ' password=' || current_db_tb_id_record.db_password || ' connect_timeout=3  keepalives=1 keepalives_idle=1 keepalives_interval=1 keepalives_count=3'');';
 		exception
 			when OTHERS then
 				raise notice 'obtain data --- create dblink connect:
@@ -607,7 +607,7 @@ for current_db_tb_id_record in select * from tb_network_sync_info where table_na
 	--创建 dblink 链接
 	current_dblink := current_db_tb_id || '_dblink';
 	begin
-		execute 'select dblink_connect(''' || current_dblink || ''','''|| 'host=' || host(current_db_tb_id_record.host) ||  ' port=' || current_db_tb_id_record.port ||  ' dbname=' || current_db_tb_id_record.db_name || ' user=' || current_db_tb_id_record.db_user || ' password=' || current_db_tb_id_record.db_password || ' connect_timeout=8 keepalives=1 keepalives_idle=1 keepalives_interval=2 keepalives_count=4'');';
+		execute 'select dblink_connect(''' || current_dblink || ''','''|| 'host=' || host(current_db_tb_id_record.host) ||  ' port=' || current_db_tb_id_record.port ||  ' dbname=' || current_db_tb_id_record.db_name || ' user=' || current_db_tb_id_record.db_user || ' password=' || current_db_tb_id_record.db_password || ' connect_timeout=3 keepalives=1 keepalives_idle=1 keepalives_interval=1 keepalives_count=3'');';
 	exception
 		when OTHERS then
 			raise notice 'write data --- Create local dblink connect:
@@ -634,7 +634,7 @@ for current_db_tb_id_record in select * from tb_network_sync_info where table_na
 	
 		--在远程数据库上创建一个到 local_db_tb 的 dblink
 		--select * from dblink('test', 'select dblink_connect(''test'', ''host=192.168.34.249 port=6789 dbname=push user=admin password=admin'')') as dlk(dc text);
-		execute 'select * from dblink(''' || current_dblink || ''', '' select dblink_connect(''''' || current_dblink || ''''', ''''host=' || host(local_db_tb_id_record.host) || ' port=' || local_db_tb_id_record.port || ' dbname=' || local_db_tb_id_record.db_name || ' user=' || local_db_tb_id_record.db_user || ' password=' || local_db_tb_id_record.db_password || ' connect_timeout=8 keepalives=1 keepalives_idle=1 keepalives_interval=2 keepalives_count=4'''')'') as ret_net_dblink(err_msg text);';
+		execute 'select * from dblink(''' || current_dblink || ''', '' select dblink_connect(''''' || current_dblink || ''''', ''''host=' || host(local_db_tb_id_record.host) || ' port=' || local_db_tb_id_record.port || ' dbname=' || local_db_tb_id_record.db_name || ' user=' || local_db_tb_id_record.db_user || ' password=' || local_db_tb_id_record.db_password || ' connect_timeout=3 keepalives=1 keepalives_idle=1 keepalives_interval=1 keepalives_count=3'''')'') as ret_net_dblink(err_msg text);';
 	exception
 		when OTHERS then
 			raise notice 'write data --- Create net dblink connect:
@@ -920,7 +920,14 @@ ALTER FUNCTION public.update_trigger_for_sync_tb_push_record() OWNER TO admin;
 --
 
 CREATE VIEW ddddd_tb_push_record_view AS
-SELECT tb_push_record.push_id, tb_push_record.pull_id, tb_push_record.push_content, tb_push_record.push_start_time, tb_push_record.push_finish_time, tb_push_record.push_type, tb_push_record.record_write_time FROM dblink('test_dblink'::text, 'select * from tb_push_record'::text) tb_push_record(push_id uuid, pull_id uuid, push_content bytea, push_start_time timestamp without time zone, push_finish_time timestamp without time zone, push_type smallint, record_write_time timestamp with time zone);
+ SELECT tb_push_record.push_id,
+    tb_push_record.pull_id,
+    tb_push_record.push_content,
+    tb_push_record.push_start_time,
+    tb_push_record.push_finish_time,
+    tb_push_record.push_type,
+    tb_push_record.record_write_time
+   FROM dblink('test_dblink'::text, 'select * from tb_push_record'::text) tb_push_record(push_id uuid, pull_id uuid, push_content bytea, push_start_time timestamp without time zone, push_finish_time timestamp without time zone, push_type smallint, record_write_time timestamp with time zone);
 
 
 ALTER TABLE ddddd_tb_push_record_view OWNER TO postgres;
@@ -1558,51 +1565,6 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
 --
--- Name: ddddd_tb_push_record_view; Type: ACL; Schema: public; Owner: postgres
---
-
-REVOKE ALL ON TABLE ddddd_tb_push_record_view FROM PUBLIC;
-REVOKE ALL ON TABLE ddddd_tb_push_record_view FROM postgres;
-GRANT ALL ON TABLE ddddd_tb_push_record_view TO postgres;
-
-
---
--- Name: tb_area_server; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_area_server FROM PUBLIC;
-REVOKE ALL ON TABLE tb_area_server FROM admin;
-GRANT ALL ON TABLE tb_area_server TO admin;
-
-
---
--- Name: tb_ip_area_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_ip_area_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_ip_area_info FROM admin;
-GRANT ALL ON TABLE tb_ip_area_info TO admin;
-
-
---
--- Name: tb_network_sync_info; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_network_sync_info FROM PUBLIC;
-REVOKE ALL ON TABLE tb_network_sync_info FROM admin;
-GRANT ALL ON TABLE tb_network_sync_info TO admin;
-
-
---
--- Name: tb_pull_id; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_pull_id FROM PUBLIC;
-REVOKE ALL ON TABLE tb_pull_id FROM admin;
-GRANT ALL ON TABLE tb_pull_id TO admin;
-
-
---
 -- Name: tb_push_record; Type: ACL; Schema: public; Owner: admin
 --
 
@@ -1618,33 +1580,6 @@ GRANT ALL ON TABLE tb_push_record TO admin;
 REVOKE ALL ON TABLE tb_push_record_history FROM PUBLIC;
 REVOKE ALL ON TABLE tb_push_record_history FROM admin;
 GRANT ALL ON TABLE tb_push_record_history TO admin;
-
-
---
--- Name: tb_push_server; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_push_server FROM PUBLIC;
-REVOKE ALL ON TABLE tb_push_server FROM admin;
-GRANT ALL ON TABLE tb_push_server TO admin;
-
-
---
--- Name: tb_test; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_test FROM PUBLIC;
-REVOKE ALL ON TABLE tb_test FROM admin;
-GRANT ALL ON TABLE tb_test TO admin;
-
-
---
--- Name: tb_test_dblink; Type: ACL; Schema: public; Owner: admin
---
-
-REVOKE ALL ON TABLE tb_test_dblink FROM PUBLIC;
-REVOKE ALL ON TABLE tb_test_dblink FROM admin;
-GRANT ALL ON TABLE tb_test_dblink TO admin;
 
 
 --

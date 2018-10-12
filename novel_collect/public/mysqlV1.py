@@ -29,14 +29,33 @@ class MysqlManager(Singleton):
             conn.commit()
         except Exception as e:
             conn.rollback()
-            raise RuntimeError("sql[{0}]执行出错:{1}".format(sql, str(e)))
+            raise RuntimeError("\n sql[{0}]执行出错:{1}".format(sql, str(e)))
         finally:
             conn.close()
             cur.close()
         return result
 
+    @staticmethod
+    def insert(table, **kwargs):
+        keys = []
+        values = []
+        for key, value in kwargs.items():
+            keys.append(key)
+            values.append("'{0}'".format(value) if type(value) not in [int, float] else str(value))
+        sql = "insert into {0}({1}) values({2})".format(table, ",".join(keys), ",".join(values))
+        MysqlManager.execute(sql)
+
 if __name__ == "__main__":
     mysqldb = MysqlManager(host="localhost")
-    sql = "select * from student"
-    result = MysqlManager.execute(sql)
-    print([r for r in result])
+    from datetime import datetime
+    data = {
+        "id" : 10004,
+        "name" : "xiaoqiang",
+        "age" : 30,
+        "add_time" : datetime.now(),
+    }
+    mysqldb.insert("student", **data)
+
+    # sql = "select * from student"
+    # result = mysqldb.execute(sql)
+    # print([r for r in result])
