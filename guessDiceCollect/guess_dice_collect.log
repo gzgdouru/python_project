@@ -1,0 +1,1 @@
+[2018-10-25 11:11:44,787] [novel] [ERROR] : sql[select * from tb_guess_dice where limit 3]Ö´ÐÐ³ö´í:(1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'limit 3' at line 1")

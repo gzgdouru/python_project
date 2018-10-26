@@ -8,9 +8,9 @@ from concurrent import futures
 
 from parseConfig import ParseConfig
 from novelLog import logger
-from public.mysqlV1 import MysqlManager
-from public.myEmail import MyEmail
-from utils import send_sms
+from utils.mysqlV1 import MysqlManager
+from utils.myEmail import MyEmail
+from utils.sms import send_sms
 from dataStructures import EXCEPTION_PREFIX
 
 
