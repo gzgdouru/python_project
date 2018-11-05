@@ -29,6 +29,7 @@ class MysqlManager(Singleton):
     def execute(cls, sql):
         conn = cls.pool.connection()
         cur = conn.cursor()
+        record_list = []
 
         try:
             cur.execute(sql)
@@ -36,13 +37,14 @@ class MysqlManager(Singleton):
             fields = [filed[0] for filed in cur.description]
             Record = namedtuple("Record", fields)
             for record in cur.fetchall():
-                yield Record(**record)
+                record_list.append(Record(**record))
         except Exception as e:
             conn.rollback()
             raise RuntimeError("sql[{0}]执行出错:{1}".format(sql, str(e)))
         finally:
             conn.close()
             cur.close()
+        return record_list
 
     @classmethod
     def insert(cls, table, **kwargs):
