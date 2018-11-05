@@ -32,9 +32,16 @@ def linux_pre_start():
         display.start()
 
 
+def get_proxy():
+    record = list(mysqldb.execute("select * from proxys where protocol=2 order by rand() limit 1"))[0]
+    return "http://{0}:{1}".format(record.ip, record.port)
+
+
 def get_info():
-    url = r"https://1063333.cc/betcenter"
-    browser = webdriver.Chrome(executable_path="chromedriver")
+    url = r"https://1064444.cc/betcenter"
+    chromeOptions = webdriver.ChromeOptions()
+    chromeOptions.add_argument('--proxy-server={0}'.format(get_proxy()))
+    browser = webdriver.Chrome(executable_path="e:/chromedriver", chrome_options=chromeOptions)
     browser.get(url)
 
     browser.find_element_by_css_selector(".menuItem___1Gogq button[value='KUAI3']").click()
@@ -76,7 +83,7 @@ if __name__ == "__main__":
                                                              lf3info.num_3))
         except Exception as e:
             logger.error(str(e))
-        time.sleep(20)
+        time.sleep(random.randint(20, 60))
 
     # history_records = mysqldb.execute("select * from tb_guess_dice where period BETWEEN '20181026253' and '20181026255' order by period desc limit 4")
     # prediction = result_prediction(list(history_records))

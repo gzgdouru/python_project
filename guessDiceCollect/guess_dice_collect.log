@@ -1,1 +1,47 @@
 [2018-10-25 11:11:44,787] [novel] [ERROR] : sql[select * from tb_guess_dice where limit 3]执行出错:(1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'limit 3' at line 1")
+[2018-10-27 23:08:37,289] [novel] [ERROR] : Message: 'chromedriver' executable needs to be in PATH. Please see https://sites.google.com/a/chromium.org/chromedriver/home
+
+[2018-10-27 23:08:57,291] [novel] [ERROR] : Message: 'chromedriver' executable needs to be in PATH. Please see https://sites.google.com/a/chromium.org/chromedriver/home
+
+[2018-10-27 23:09:06,498] [novel] [INFO] : 保存 LK3INFO[20181027634:1 1 2] 成功.
+[2018-10-27 23:09:17,292] [novel] [ERROR] : Message: 'chromedriver' executable needs to be in PATH. Please see https://sites.google.com/a/chromium.org/chromedriver/home
+
+[2018-10-27 23:09:37,293] [novel] [ERROR] : Message: 'chromedriver' executable needs to be in PATH. Please see https://sites.google.com/a/chromium.org/chromedriver/home
+
+[2018-10-27 23:09:38,438] [novel] [INFO] : LK3INFO[20181027634:1 1 2] 已存在.
+[2018-10-27 23:10:10,235] [novel] [ERROR] : list index out of range
+[2018-10-27 23:20:27,432] [novel] [INFO] : 保存 LK3INFO[20181027640:1 4 6] 成功.
+[2018-10-27 23:20:59,321] [novel] [INFO] : LK3INFO[20181027640:1 4 6] 已存在.
+[2018-10-27 23:21:31,808] [novel] [INFO] : LK3INFO[20181027640:1 4 6] 已存在.
+[2018-10-27 23:22:03,453] [novel] [ERROR] : list index out of range
+[2018-10-27 23:22:35,322] [novel] [INFO] : 保存 LK3INFO[20181027641:4 5 6] 成功.
+[2018-10-27 23:23:07,555] [novel] [INFO] : LK3INFO[20181027641:4 5 6] 已存在.
+[2018-10-27 23:23:39,706] [novel] [INFO] : LK3INFO[20181027641:4 5 6] 已存在.
+[2018-10-27 23:24:11,704] [novel] [INFO] : 保存 LK3INFO[20181027642:4 4 5] 成功.
+[2018-10-27 23:24:43,496] [novel] [INFO] : LK3INFO[20181027642:4 4 5] 已存在.
+[2018-10-27 23:25:16,201] [novel] [INFO] : LK3INFO[20181027642:4 4 5] 已存在.
+[2018-10-27 23:25:48,714] [novel] [INFO] : LK3INFO[20181027642:4 4 5] 已存在.
+[2018-10-27 23:26:21,500] [novel] [INFO] : 保存 LK3INFO[20181027643:2 5 6] 成功.
+[2018-10-27 23:26:54,042] [novel] [INFO] : LK3INFO[20181027643:2 5 6] 已存在.
+[2018-10-27 23:27:26,671] [novel] [INFO] : LK3INFO[20181027643:2 5 6] 已存在.
+[2018-10-27 23:27:59,086] [novel] [INFO] : LK3INFO[20181027643:2 5 6] 已存在.
+[2018-10-27 23:28:31,399] [novel] [INFO] : 保存 LK3INFO[20181027644:1 5 5] 成功.
+[2018-10-27 23:29:04,213] [novel] [INFO] : LK3INFO[20181027644:1 5 5] 已存在.
+[2018-10-27 23:29:36,508] [novel] [INFO] : LK3INFO[20181027644:1 5 5] 已存在.
+[2018-10-27 23:30:09,561] [novel] [ERROR] : list index out of range
+[2018-10-27 23:30:42,156] [novel] [INFO] : 保存 LK3INFO[20181027645:3 5 5] 成功.
+[2018-10-27 23:31:14,586] [novel] [INFO] : LK3INFO[20181027645:3 5 5] 已存在.
+[2018-11-05 18:36:07,427] [novel] [ERROR] : list index out of range
+[2018-11-05 18:36:39,260] [novel] [INFO] : 保存 LK3INFO[20181105498:1 2 5] 成功.
+[2018-11-05 18:37:10,904] [novel] [INFO] : LK3INFO[20181105498:1 2 5] 已存在.
+[2018-11-05 18:37:42,668] [novel] [INFO] : LK3INFO[20181105498:1 2 5] 已存在.
+[2018-11-05 18:38:14,452] [novel] [INFO] : 保存 LK3INFO[20181105499:5 5 6] 成功.
+[2018-11-05 18:38:46,643] [novel] [INFO] : LK3INFO[20181105499:5 5 6] 已存在.
+[2018-11-05 18:39:18,117] [novel] [INFO] : LK3INFO[20181105499:5 5 6] 已存在.
+[2018-11-05 18:39:49,638] [novel] [INFO] : LK3INFO[20181105499:5 5 6] 已存在.
+[2018-11-05 18:40:21,441] [novel] [INFO] : 保存 LK3INFO[20181105500:3 3 4] 成功.
+[2018-11-05 18:40:53,012] [novel] [INFO] : LK3INFO[20181105500:3 3 4] 已存在.
+[2018-11-05 18:41:24,531] [novel] [INFO] : LK3INFO[20181105500:3 3 4] 已存在.
+[2018-11-05 18:41:56,153] [novel] [INFO] : LK3INFO[20181105500:3 3 4] 已存在.
+[2018-11-05 18:49:33,967] [novel] [ERROR] : sql[select * from proxys where protocol=2 order by rang() limit 1]执行出错:(1305, 'FUNCTION novel.rang does not exist')
+[2018-11-05 18:50:12,202] [novel] [INFO] : 保存 LK3INFO[20181105505:4 4 6] 成功.
