@@ -3,37 +3,18 @@ from collections import Counter, namedtuple
 DiceInfo = namedtuple("DiceInfo", ["period", "num_1", "num_2", "num_3", "total", "prediction"])
 
 
-def nums_prediction(history, nums):
-    num_list = list(nums)
-    prediction_nums = []
-    # 保存连续三期没出现的号码
-    [prediction_nums.append(num) for num in num_list if
-     num not in history[0] and num not in history[1] and num not in history[2]]
-
-    # 保存没有连续出现了两期的号码
-    [prediction_nums.append(num) for num in num_list if
-     (num not in history[0] or num not in history[1]) and num not in prediction_nums]
-
-    # 保证返回至少3个号码
-    while len(prediction_nums) < 4:
-        prediction_nums.append(num_list[0])
-    return "".join(map(str, prediction_nums[:3]))
-
-
 def result_prediction(history_records):
-    # 发疯状态, 连续开
-    if is_period_same(history_records, "大"):
+    if not history_records:
+        return "未知"
+
+    # 发疯状态, 连续开, 3期及以上
+    if is_period_same(history_records[:3], "大"):
         return "大"
-    elif is_period_same(history_records, "小"):
+    elif is_period_same(history_records[:3], "小"):
         return "小"
 
-    # 先分析最近两期记录
-    maxCount, minCount = get_maxmin_count(history_records[:2])
-    if maxCount != minCount:
-        return "小" if maxCount > minCount else "大"
-
-    # 后分析最近三期记录
-    maxCount, minCount = get_maxmin_count(history_records[:3])
+    #按大小个数分析
+    maxCount, minCount = get_maxmin_count(history_records)
     return "小" if maxCount > minCount else "大"
 
 

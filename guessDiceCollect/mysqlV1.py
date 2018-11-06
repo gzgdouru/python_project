@@ -29,22 +29,23 @@ class MysqlManager(Singleton):
     def execute(cls, sql):
         conn = cls.pool.connection()
         cur = conn.cursor()
-        record_list = []
 
         try:
-            cur.execute(sql)
+            row_num = cur.execute(sql)
             conn.commit()
-            fields = [filed[0] for filed in cur.description]
-            Record = namedtuple("Record", fields)
-            for record in cur.fetchall():
-                record_list.append(Record(**record))
+            records = cur.fetchall()
+            if records:
+                fields = [filed[0] for filed in cur.description]
+                Record = namedtuple("Record", fields)
+                for record in records:
+                    yield Record(**record)
+
         except Exception as e:
             conn.rollback()
             raise RuntimeError("sql[{0}]执行出错:{1}".format(sql, str(e)))
         finally:
             conn.close()
             cur.close()
-        return record_list
 
     @classmethod
     def insert(cls, table, **kwargs):
@@ -71,7 +72,7 @@ class MysqlManager(Singleton):
         return rows
 
     @classmethod
-    def select(cls, table, conditions=None, order_by=None):
+    def select(cls, table, conditions=None, order_by=None, limit=None):
         sql = "select * from {table}".format(table=table)
 
         if conditions:
@@ -80,6 +81,9 @@ class MysqlManager(Singleton):
         if order_by:
             order_by = order_by if order_by[0] != "-" else "{0} desc".format(order_by[1:])
             sql = "{query} order by {order_by}".format(query=sql, order_by=order_by)
+
+        if limit:
+            sql = "{query} limit {num}".format(query=sql, num=limit)
 
         return cls.execute(sql)
 
@@ -96,14 +100,27 @@ class MysqlManager(Singleton):
     @classmethod
     def exist(cls, table, conditions):
         sql = "select 1 as is_exist from {table} where {conditions} limit 1".format(table=table, conditions=conditions)
-        result = cls.execute(sql)
-        for r in result:
+        result = list(cls.execute(sql))
+        if result:
             return True
-        return False
-
+        else:
+            return False
 
 if __name__ == "__main__":
-    mysqldb = MysqlManager(host="localhost")
-    rows = mysqldb.select("student")
-    for row in rows:
-        print(row)
+    # mysqldb = MysqlManager(host="localhost")
+    # print(mysqldb.exist("student", conditions="name='ouru'"))
+    # mysqldb.insert("student", name="ouru", age=30, add_time=datetime.now())
+    from guessDiceUtils import result_prediction
+    mysqlConfig = {
+        "host": "193.112.150.18",
+        "port": 3306,
+        "user": "ouru",
+        "password": "5201314Ouru...",
+        "db": "novel",
+        "charset": "utf8",
+        "max_overflow": 10,
+    }
+    mysqldb = MysqlManager(**mysqlConfig)
+    history_records = list(mysqldb.select("tb_guess_dice", order_by="-period", limit=3))
+    prediction = result_prediction(history_records)
+    print(prediction)

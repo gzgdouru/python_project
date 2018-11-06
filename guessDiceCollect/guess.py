@@ -6,12 +6,17 @@ from selenium import webdriver
 import time
 from lxml import etree
 import sys
+import requests
+import json
 
-LK3Info = namedtuple("LK3Info", ["period", "num_1", "num_2", "num_3"])
+from fake_useragent import UserAgent
+from scrapy import Selector
 
 from mysqlV1 import MysqlManager
 from log_settings import logger
 from guessDiceUtils import result_prediction
+
+LK3Info = namedtuple("LK3Info", ["period", "num_1", "num_2", "num_3"])
 
 mysqlConfig = {
     "host": "193.112.150.18",
@@ -23,101 +28,92 @@ mysqlConfig = {
     "max_overflow": 10,
 }
 mysqldb = MysqlManager(**mysqlConfig)
+ua = UserAgent()
 
 
-def linux_pre_start():
-    if sys.platform[:3] != "win":
-        from pyvirtualdisplay import Display
-        display = Display(visible=0, size=(800, 600))
-        display.start()
+def get_nums(value):
+    nums = [int(num) for num in str(value).split(",")]
+    return nums
 
 
-def get_proxy(table):
-    sql = "select * from {0} order by rand() limit 1".format(table)
-    records =  mysqldb.execute(sql)
-    if records:
-        for record in records:
-            return record.ip, record.port
+def get_proxy():
+    records = mysqldb.select("proxys", conditions="score > 0", order_by="rand()", limit=1)
+    for record in records:
+        return record.ip, record.port
     return None, None
 
 
-def get_info(proxy_table):
-    url = r"https://1064444.cc/betcenter"
-    ip, port = get_proxy(proxy_table)
-    if not ip or not port:
-        logger.error("从{0}表获取代理ip/port失败!".format(proxy_table))
-        return False, None
+def parse_info():
+    url = r'https://1064444.cc/api/v1/result/service/mobile/results/hist/HF_LFK3?limit=40'
+    headers = {"User-Agent": ua.random}
+    ip, port = get_proxy()
+    time_start = time.time()
 
-    chromeOptions = webdriver.ChromeOptions()
-    logger.info("通过代理[{0}:{1}]访问.".format(ip, port))
-    chromeOptions.add_argument('--proxy-server=http://{0}:{1}'.format(ip, port))
-    browser = webdriver.Chrome(executable_path="chromedriver", chrome_options=chromeOptions)
     try:
-        browser.get(url)
+        if ip and port:
+            logger.info("通过代理[{0}:{1}]访问!".format(ip, port))
+            proxy = "http://{0}:{1}".format(ip, port)
+            proxies = {"https": proxy}
+            response = requests.get(url=url, headers=headers, proxies=proxies, timeout=40)
+    except:
+        logger.info("通过代理[{0}:{1}]访问失败!".format(ip, port))
+        list(mysqldb.execute("update proxys set score=0 where ip='{0}' and port={1}".format(ip, port)))
+        logger.info("通过本机ip访问!")
+        response = requests.get(url=url, headers=headers, timeout=10)
+    try:
+        if not response:
+            logger.info("通过本机ip访问!")
+            response = requests.get(url=url, headers=headers, timeout=10)
 
-        browser.find_element_by_css_selector(".menuItem___1Gogq button[value='KUAI3']").click()
-        # print(browser.page_source)
-        time.sleep(2)
-        browser.find_element_by_css_selector(".menuItem___1Gogq button[value='HF_LFK3']").click()
-
-        htmltree = etree.HTML(browser.page_source, parser=etree.HTMLParser())
-
-        period = htmltree.xpath(
-            "//div[@class='playground_headerLastOpenResult___cEu68']/p[@class='gameHeader_headerPhase___1z297']/strong/text()")[
-            0]
-
-        numsNodes = htmltree.xpath(
-            "//div[@class='gameHeader_openNumbers___NzikQ']/span[contains(@class, 'dice___3WFnf')]")
-        nums = (int(node.get("data-num")) for node in numsNodes)
-        browser.quit()
-
-        #保存有效代理ip到数据库
-        if "tb_vaild_proxies" != proxy_table:
-            logger.info("add vaild proxy[{0}:{1}] to tb_vaild_proxies表".format(ip, port))
-            mysqldb.insert("tb_vaild_proxies", ip=ip, port=int(port))
-        return True, LK3Info(*(period, *nums))
-    except Exception as e:
-        browser.quit()
-        logger.error("get_info({0}) failed, error:{1}".format(proxy_table, e))
-        logger.info("remove invaild proxy[{0}:{1}] for {2}表!".format(ip, port, proxy_table))
         try:
-            sql = "delete from {0} where (ip='{1}' and port={2}) or protocol=0".format(proxy_table, ip, port)
-            mysqldb.execute(sql)
-        except:
-            pass
-    return False, None
+            data_type = response.headers["Content-Type"]
+            records = []
+            if -1 != data_type.find("json"):
+                # json格式返回
+                records = json.loads(response.text)
+            elif -1 != data_type.find("xml"):
+                # xml格式返回
+                records = []
+                selector = Selector(text=response.text)
+                item_nodes = selector.xpath("//item")
+                for node in item_nodes:
+                    record = {}
+                    record["openCode"] = node.xpath("//opencode/text()").extract_first()
+                    record["uniqueIssueNumber"] = node.xpath("//uniqueissuenumber/text()").extract_first()
+                    records.append(record)
+            else:
+                logger.error("未知的数据格式, 数据格式:{0}, 数据内容:{1}".format(data_type, response.text))
+        except Exception as e:
+            logger.error("数据解析出错, 数据格式:{0}, 错误原因:{1}".format(data_type, e))
+
+        for record in records:
+            nums = get_nums(record["openCode"])
+            period = record["uniqueIssueNumber"]
+            if mysqldb.exist("tb_guess_dice", conditions="period='{0}'".format(period)):
+                logger.info("记录[{0}({1}, {2}, {3})]已存在.".format(period, nums[0], nums[1], nums[2]))
+                break  # 最新一期存在的话, 后面缺的就不补了
+            else:
+                history_records = list(mysqldb.select("tb_guess_dice", order_by="-period", limit=11))
+                three_prediction = result_prediction(history_records[:3])
+                five_prediction = result_prediction(history_records[:5])
+                seven_prediction = result_prediction(history_records[:7])
+                nine_prediction = result_prediction(history_records[:9])
+                eleven_prediction = result_prediction(history_records[:11])
+                total = sum(nums)
+                mysqldb.insert("tb_guess_dice", period=period, num_1=nums[0], num_2=nums[1], num_3=nums[2],
+                               add_time=datetime.now(), total=total, three_prediction=three_prediction,
+                               five_prediction=five_prediction, seven_prediction=seven_prediction,
+                               nine_prediction=nine_prediction, eleven_prediction=eleven_prediction)
+                logger.info("记录[{0}({1}, {2}, {3})]保存成功.".format(period, nums[0], nums[1], nums[2]))
+    except Exception as e:
+        logger.error("提取信息出错, 错误原因:{0}!".format(e))
+    time_end = time.time()
+    logger.info("提取信息完成, 耗时:{0}".format(time_end - time_start))
+
 
 if __name__ == "__main__":
-    linux_pre_start()
-
     while True:
-        try:
-            status, lf3info = get_info("proxys")
-            if not status:
-                status, lf3info = get_info("tb_vaild_proxies")
-
-            if lf3info:
-                conditions = "period = '{0}'".format(lf3info.period)
-                if mysqldb.exist("tb_guess_dice", conditions=conditions):
-                    logger.info(
-                        "LK3INFO[{0}:{1} {2} {3}] 已存在.".format(lf3info.period, lf3info.num_1, lf3info.num_2, lf3info.num_3))
-                else:
-                    total = sum([lf3info.num_1, lf3info.num_2, lf3info.num_3])
-                    history_records = mysqldb.execute("select * from tb_guess_dice order by period desc limit 4")
-                    mysqldb.insert("tb_guess_dice", period=lf3info.period, num_1=lf3info.num_1, num_2=lf3info.num_2,
-                                   num_3=lf3info.num_3, total=total, prediction=result_prediction(list(history_records)),
-                                   add_time=datetime.now())
-                    logger.info(
-                        "保存 LK3INFO[{0}:{1} {2} {3}] 成功.".format(lf3info.period, lf3info.num_1, lf3info.num_2,
-                                                                 lf3info.num_3))
-            else:
-                logger.error("获取网页信息失败!")
-        except Exception as e:
-            logger.error(str(e))
-        sleep_time = random.randint(5, 20)
-        logger.info("休眠{0}秒.".format(sleep_time))
+        parse_info()
+        sleep_time = random.randint(30, 40)
+        logger.info("休眠{0}秒!".format(sleep_time))
         time.sleep(sleep_time)
-
-        # history_records = mysqldb.execute("select * from tb_guess_dice where period BETWEEN '20181026253' and '20181026255' order by period desc limit 4")
-        # prediction = result_prediction(list(history_records))
-        # print(prediction)
