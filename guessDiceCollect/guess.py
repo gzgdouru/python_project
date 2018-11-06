@@ -10,7 +10,6 @@ import requests
 import json
 
 from fake_useragent import UserAgent
-from scrapy import Selector
 
 from mysqlV1 import MysqlManager
 from log_settings import logger
@@ -74,12 +73,12 @@ def parse_info():
             elif -1 != data_type.find("xml"):
                 # xml格式返回
                 records = []
-                selector = Selector(text=response.text)
-                item_nodes = selector.xpath("//item")
+                xml_tree = etree.XML(response.text, etree.XMLParser())
+                item_nodes = xml_tree.xpath("//item")
                 for node in item_nodes:
                     record = {}
-                    record["openCode"] = node.xpath("//opencode/text()").extract_first()
-                    record["uniqueIssueNumber"] = node.xpath("//uniqueissuenumber/text()").extract_first()
+                    record["openCode"] = node.xpath("openCode/text()")[0]
+                    record["uniqueIssueNumber"] = node.xpath("uniqueIssueNumber/text()")[0]
                     records.append(record)
             else:
                 logger.error("未知的数据格式, 数据格式:{0}, 数据内容:{1}".format(data_type, response.text))
