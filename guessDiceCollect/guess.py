@@ -36,7 +36,7 @@ def get_nums(value):
 
 
 def get_proxy():
-    records = mysqldb.select("proxys", conditions="score > 0", order_by="rand()", limit=1)
+    records = mysqldb.select("proxys", conditions="score > 1", order_by="rand()", limit=1)
     for record in records:
         return record.ip, record.port
     return None, None
@@ -56,7 +56,7 @@ def parse_info():
             response = requests.get(url=url, headers=headers, proxies=proxies, timeout=40)
     except:
         logger.info("通过代理[{0}:{1}]访问失败!".format(ip, port))
-        list(mysqldb.execute("update proxys set score=0 where ip='{0}' and port={1}".format(ip, port)))
+        list(mysqldb.execute("update proxys set score=1 where ip='{0}' and port={1}".format(ip, port)))
         logger.info("通过本机ip访问!")
         response = requests.get(url=url, headers=headers, timeout=10)
     try:
