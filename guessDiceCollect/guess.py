@@ -24,7 +24,7 @@ mysqlConfig = {
     "password": "5201314Ouru...",
     "db": "novel",
     "charset": "utf8",
-    "max_overflow": 10,
+    "max_overflow": 5,
 }
 mysqldb = MysqlManager(**mysqlConfig)
 ua = UserAgent()
@@ -36,55 +36,59 @@ def get_nums(value):
 
 
 def get_proxy():
-    records = mysqldb.select("proxys", conditions="score > 1", order_by="rand()", limit=1)
+    records = mysqldb.select("proxys", conditions="score > 0", order_by="rand()", limit=1)
     for record in records:
         return record.ip, record.port
     return None, None
 
 
-def parse_info():
-    url = r'https://1064444.cc/api/v1/result/service/mobile/results/hist/HF_LFK3?limit=40'
-    headers = {"User-Agent": ua.random}
+def get_response(url, headers, try_time=3):
     ip, port = get_proxy()
-    time_start = time.time()
-
     try:
         if ip and port:
             logger.info("通过代理[{0}:{1}]访问!".format(ip, port))
             proxy = "http://{0}:{1}".format(ip, port)
             proxies = {"https": proxy}
-            response = requests.get(url=url, headers=headers, proxies=proxies, timeout=40)
+            response = requests.get(url=url, headers=headers, proxies=proxies, timeout=30)
     except:
-        logger.info("通过代理[{0}:{1}]访问失败!".format(ip, port))
-        list(mysqldb.execute("update proxys set score=1 where ip='{0}' and port={1}".format(ip, port)))
-        logger.info("通过本机ip访问!")
-        response = requests.get(url=url, headers=headers, timeout=10)
-    try:
-        if not response:
-            logger.info("通过本机ip访问!")
+        try_time -= 1
+        logger.info("通过代理[{0}:{1}]访问失败, 再尝试{2}次代理访问!".format(ip, port, try_time))
+        if try_time <= 0:
+            logger.info("代理访问失败, 通过本机ip访问!")
             response = requests.get(url=url, headers=headers, timeout=10)
+        else:
+            response = get_response(url, headers, try_time)
+    return response
 
-        try:
-            data_type = response.headers["Content-Type"]
+
+def parse_info():
+    url = r'https://1064444.cc/api/v1/result/service/mobile/results/hist/HF_LFK3?limit=40'
+    headers = {"User-Agent": ua.random}
+    time_start = time.time()
+
+    try:
+        response = get_response(url, headers)
+        data_type = response.headers["Content-Type"]
+        records = []
+        if -1 != data_type.find("json"):
+            # json格式返回
+            records = json.loads(response.text)
+        elif -1 != data_type.find("xml"):
+            # xml格式返回
             records = []
-            if -1 != data_type.find("json"):
-                # json格式返回
-                records = json.loads(response.text)
-            elif -1 != data_type.find("xml"):
-                # xml格式返回
-                records = []
-                xml_tree = etree.XML(response.text, etree.XMLParser())
-                item_nodes = xml_tree.xpath("//item")
-                for node in item_nodes:
-                    record = {}
-                    record["openCode"] = node.xpath("openCode/text()")[0]
-                    record["uniqueIssueNumber"] = node.xpath("uniqueIssueNumber/text()")[0]
-                    records.append(record)
-            else:
-                logger.error("未知的数据格式, 数据格式:{0}, 数据内容:{1}".format(data_type, response.text))
-        except Exception as e:
-            logger.error("数据解析出错, 数据格式:{0}, 错误原因:{1}".format(data_type, e))
+            xml_tree = etree.XML(response.text, etree.XMLParser())
+            item_nodes = xml_tree.xpath("//item")
+            for node in item_nodes:
+                record = {}
+                record["openCode"] = node.xpath("openCode/text()")[0]
+                record["uniqueIssueNumber"] = node.xpath("uniqueIssueNumber/text()")[0]
+                records.append(record)
+        else:
+            logger.error("未知的数据格式, 数据格式:{0}, 数据内容:{1}".format(data_type, response.text))
+    except Exception as e:
+        logger.error("数据解析出错, 数据格式:{0}, 错误原因:{1}".format(data_type, e))
 
+    try:
         for record in records:
             nums = get_nums(record["openCode"])
             period = record["uniqueIssueNumber"]
@@ -113,6 +117,6 @@ def parse_info():
 if __name__ == "__main__":
     while True:
         parse_info()
-        sleep_time = random.randint(30, 40)
+        sleep_time = random.randint(20, 30)
         logger.info("休眠{0}秒!".format(sleep_time))
         time.sleep(sleep_time)
